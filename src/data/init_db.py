@@ -1,14 +1,10 @@
-from pathlib import Path
 import sqlite3
 import pandas as pd
 
-DATA_DIR = Path("../data")
-DB_DIR = DATA_DIR / "sql"
-DB_PATH = DB_DIR / "metadata.db"
-CSV_PATH = DATA_DIR / "metadata.csv"
+from ..config import DB_PATH, SQL_DIR, CSV_PATH
 
 def build_metadata_db():
-    DB_DIR.mkdir(parents=True, exist_ok=True)
+    SQL_DIR.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(CSV_PATH)
 
