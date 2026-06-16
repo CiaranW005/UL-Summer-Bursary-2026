@@ -36,9 +36,11 @@ if __name__ == "__main__":
 
     print(f"Images: {len(loader.dataset)}")
 
-    embeddings, indices = get_embeddings(model=model, loader=loader, device=device)
+    cls_tokens, patches, indices = get_embeddings(model=model, loader=loader, device=device)
 
-    print(f"Embeddings Shape: {embeddings.shape}")
-    torch.save(embeddings, EMBEDS_DIR / "raw_embeds.pt")
+    print(f"cls_tokens Shape: {cls_tokens.shape}")
+    print(f"Patches Shape: {patches.shape}")
 
-    build_index(embs=embeddings)
+    torch.save({"cls_tokens": cls_tokens, "patches": patches}, EMBEDS_DIR / "base_embeds.pt")
+
+    build_index(embs=cls_tokens)
