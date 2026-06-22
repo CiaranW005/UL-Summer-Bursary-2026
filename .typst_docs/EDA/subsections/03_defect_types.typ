@@ -6,7 +6,7 @@ The following visualisations show how defect types are distributed within each c
 
 #align(center)[
     #figure(
-        image("../images/distribution_defect_sample.png", width: 105%),
+        image("../images/distribution_defect_sample.png", width: 130%),
         caption: ("A sample of the distributions of defects in the data")
     )
 ]
