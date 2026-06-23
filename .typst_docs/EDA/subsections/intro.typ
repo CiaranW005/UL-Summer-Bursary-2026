@@ -1,6 +1,6 @@
 = Exploratory Data Analysis
 
-This notebook presents an exploratory data analysis (EDA) of the MVTec Anomaly Detection MVTec AD[add source] dataset. MVTec AD is a benchmark dataset for unsupervised anomaly detection in industrial inspection and contains over 5,000 images across 15 object categories. Each category contains defect-free training images and a test set consisting of both normal and anomalous samples.
+This notebook presents an exploratory data analysis (EDA) of the MVTec Anomaly Detection MVTec AD@mvtec2019 dataset. MVTec AD is a benchmark dataset for unsupervised anomaly detection in industrial inspection and contains over 5,000 images across 15 object categories. Each category contains defect-free training images and a test set consisting of both normal and anomalous samples.
 
 The purpose of this analysis is to:
 

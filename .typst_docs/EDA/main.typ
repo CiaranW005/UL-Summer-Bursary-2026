@@ -13,3 +13,5 @@
 #pagebreak()
 
 #include "subsections/04_img_char.typ"
+
+#bibliography("refs.bib")
