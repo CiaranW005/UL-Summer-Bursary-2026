@@ -26,7 +26,12 @@ class EllipsoidCover:
                 X = embeds[covered_idx]
                 weights = np.ones(len(covered_idx))
 
-                center, eigvecs, eigvals, threshold, eig_ratio, ellipse_id = self.fitter.fit_supported(X, ellipsoids, weights)
+                if len(ellipsoids) > 0:
+                    ellipsoid = self.fitter.fit_supported(X, weights, ellipsoids)
+                else:
+                    ellipsoid = self.fitter.fit(X, weights)
+
+                ellipsoid.covered_idx = covered_idx
 
             else:
                 index = faiss.IndexFlatL2(uncovered_emb.shape[1])
@@ -45,7 +50,7 @@ class EllipsoidCover:
                 full_covered_idx = uncovered_idx[np.r_[local_compact, neighbours_local]]
 
                 weights = np.ones(len(full_covered_idx))
-                covered_idx, center, eigvecs, eigvals, threshold, eig_ratio, weights, ellipse_id = self.cleaner.clean_candidate(
+                ellipsoid = self.cleaner.clean_candidate(
                     full_covered_idx,
                     embeds,
                     uncovered_mask,
@@ -54,63 +59,50 @@ class EllipsoidCover:
                 )
 
                 while True:
-                    old_covered_idx = covered_idx.copy()
-                    
-                    candidate_mask = self.fitter.grow(embeds, center, eigvecs, eigvals, threshold, growth)
+                    candidate_mask = self.fitter.grow(embeds, ellipsoid, growth)
                     full_new_covered_idx = np.where(candidate_mask & uncovered_mask)[0]
 
+                    if len(full_new_covered_idx) == 0:
+                        break
+
+                    _, old_pos, new_pos = np.intersect1d(
+                        ellipsoid.covered_idx,
+                        full_new_covered_idx,
+                        return_indices=True
+                    )
                     grow_weights = np.ones(len(full_new_covered_idx))
-                    for i, idx in enumerate(full_new_covered_idx):
-                        if idx in covered_idx:
-                            old_pos = np.where(covered_idx == idx)[0][0]
-                            grow_weights[i] = weights[old_pos]
+                    grow_weights[new_pos] = ellipsoid.weights[old_pos]
+
                     weights = grow_weights
 
-                    new_covered_idx, new_center, new_eigvecs, new_eigvals, new_threshold, new_eig_ratio, new_weights, new_ellipse_id = self.cleaner.clean_candidate(
+                    self.cleaner.min_points = len(ellipsoid.covered_idx)
+                    new_ellipsoid = self.cleaner.clean_candidate(
                         full_new_covered_idx, 
                         embeds, 
                         uncovered_mask, 
                         weights,
-                        ellipsoids,
-                        min_points=len(old_covered_idx)
+                        ellipsoids
                         ) 
 
-                    if len(new_covered_idx) > len(old_covered_idx):
-                        covered_idx = new_covered_idx
-                        center = new_center
-                        eigvecs = new_eigvecs
-                        eigvals = new_eigvals
-                        threshold = new_threshold
-                        eig_ratio = new_eig_ratio
-                        weights = new_weights
-                        ellipse_id = new_ellipse_id
+                    if len(new_ellipsoid.covered_idx) > len(ellipsoid.covered_idx):
+                        ellipsoid = new_ellipsoid
                     else:
                         break
 
-            ellipsoids.append({
-                "center": center,
-                "eigvecs": eigvecs,
-                "eigvals": eigvals,
-                "threshold": threshold,
-                "eig_ratio": eig_ratio,
-                "covered_idx": covered_idx,
-                "weights": weights,
-                "ellipse_id": ellipse_id
-            })
-
-            uncovered_mask[covered_idx] = False
+            ellipsoids.append(ellipsoid)
+            uncovered_mask[ellipsoid.covered_idx] = False
 
         ellipsoids_df = pd.DataFrame([
             {
-                "n_points": len(e["covered_idx"]),
-                "threshold": e["threshold"],
-                "eig_ratio": e["eig_ratio"],
-                "weights": e["weights"]
+                "n_points": len(e.covered_idx),
+                "threshold": e.threshold,
+                "eig_ratio": e.eig_ratio,
+                "weights": e.weights
             }
             for e in ellipsoids
         ])
 
         if output_dir is not None:
-            ellipsoids_df.to_csv(output_dir / f"ellipsoids.csv", index=False)
+            ellipsoids_df.to_csv(output_dir / "ellipsoids.csv", index=False)
         
         return ellipsoids, ellipsoids_df

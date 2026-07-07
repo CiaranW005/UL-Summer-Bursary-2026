@@ -1,7 +1,5 @@
 import numpy as np
 
-from .fitter import EllipsoidFitter
-
 class CandidateCleaner:
     def __init__(self, fitter, min_points=1):
         self.fitter = fitter
@@ -9,33 +7,32 @@ class CandidateCleaner:
         self.min_points = min_points
 
     def clean_candidate(self, covered_idx, embeds, uncovered_mask, weights, ellipsoids):
-        ellipse_id = None
-
         while len(covered_idx) > self.min_points:
             X = embeds[covered_idx]
 
             if len(covered_idx) < self.fitter.support_points and len(ellipsoids) > 0:
-                center, eigvecs, eigvals, threshold, eig_ratio, ellipse_id = self.fitter.fit_supported(X, weights, ellipsoids)
+                ellipsoid = self.fitter.fit_supported(X, weights, ellipsoids)
             else:
-                center, eigvecs, eigvals, threshold, eig_ratio = self.fitter.fit(X, weights)
+                ellipsoid = self.fitter.fit(X, weights)
 
-            inside_all = self.fitter.inside(X, center, eigvecs, eigvals, threshold)
+            inside_all = self.fitter.inside(embeds, ellipsoid)
             shared_idx = np.where((inside_all) & (~uncovered_mask))[0]
 
             if len(shared_idx) == 0:
-                return covered_idx, center, eigvecs, eigvals, threshold, eig_ratio, weights, ellipse_id
+                ellipsoid.covered_idx = covered_idx
+                return ellipsoid
 
             print("Enroach Detected")
-            shared_diff = embeds[shared_idx] - center
-            shared_proj = shared_diff @ eigvecs
-            shared_contrib = (shared_proj ** 2) / eigvals
+            shared_diff = embeds[shared_idx] - ellipsoid.center
+            shared_proj = shared_diff @ ellipsoid.eigvecs
+            shared_contrib = (shared_proj ** 2) / ellipsoid.eigvals
 
             bad_shared_local = shared_contrib.sum(axis=1).argmax()
             bad_axis = shared_contrib[bad_shared_local].argmax()
 
-            cand_diff = embeds[covered_idx] - center
-            cand_proj = cand_diff @ eigvecs
-            cand_axis_contrib = (cand_proj[:, bad_axis] ** 2) / eigvals[bad_axis]
+            cand_diff = embeds[covered_idx] - ellipsoid.center
+            cand_proj = cand_diff @ ellipsoid.eigvecs
+            cand_axis_contrib = (cand_proj[:, bad_axis] ** 2) / ellipsoid.eigvals[bad_axis]
 
             worst_local = cand_axis_contrib.argmax()
             weights = self.find_weight(X, weights, worst_local, uncovered_mask)
@@ -45,12 +42,13 @@ class CandidateCleaner:
                 weights = np.delete(weights, worst_local)
 
         X = embeds[covered_idx]
-        if len(covered_idx) < self.fitter.support_points:
-            center, eigvecs, eigvals, threshold, eig_ratio, ellipse_id = self.fitter.fit_supported(X, ellipsoids, weights, min_points=self.min_points)
+        if len(covered_idx) < self.fitter.support_points and len(ellipsoids) > 0:
+            ellipsoid = self.fitter.fit_supported(X, weights, ellipsoids)
         else:
-            center, eigvecs, eigvals, threshold, eig_ratio = self.fitter.fit(X, weights)
-            
-        return covered_idx, center, eigvecs, eigvals, threshold, eig_ratio, weights, ellipse_id
+            ellipsoid = self.fitter.fit(X, weights)
+        
+        ellipsoid.covered_idx = covered_idx
+        return ellipsoid
     
 
     def find_weight(self, X, weights, worst_local, uncovered_mask, space=10):
@@ -63,9 +61,9 @@ class CandidateCleaner:
             mid = (lo + hi) / 2
             
             test_weights[worst_local] = mid
-            center, eigvecs, eigvals, threshold, _ = self.fitter.fit(X, test_weights)
+            ellipsoid = self.fitter.fit(X, test_weights)
 
-            inside_all = self.fitter.inside(X, center, eigvecs, eigvals, threshold)
+            inside_all = self.fitter.inside(X, ellipsoid)
             shared_idx = np.where((inside_all) & (~uncovered_mask))[0]
 
             if len(shared_idx) == 0:

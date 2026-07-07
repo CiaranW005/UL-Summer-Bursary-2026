@@ -8,5 +8,7 @@ class Ellipsoid:
     eigvals: np.ndarray
     threshold: float
     eig_ratio: float
-    support_id: int | None = None
 
+    support_id: int | None = None
+    weights: np.ndarray | None = None
+    covered_idx: np.ndarray | None = None

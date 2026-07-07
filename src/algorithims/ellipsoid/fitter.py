@@ -1,5 +1,7 @@
 import numpy as np
 
+from .ellipsoid import Ellipsoid
+
 class EllipsoidFitter:
     def __init__(self, support_points=5, reg=1e-4):
         self.support_points=support_points
@@ -36,7 +38,14 @@ class EllipsoidFitter:
 
         eig_ratio = eigvals.max() / eigvals.min() 
 
-        return center, eigvecs, eigvals, threshold, eig_ratio
+        return Ellipsoid(
+            center=center,
+            eigvecs=eigvecs,
+            eigvals=eigvals,
+            threshold=threshold,
+            eig_ratio=eig_ratio,
+            weights=weights
+        )
     
     def fit_supported(self, X, weights, previous_ellipsoids):
         w = weights / weights.sum()
@@ -53,12 +62,12 @@ class EllipsoidFitter:
             own_cov = np.eye(X.shape[1])
 
         support_id = np.argmin([
-            np.linalg.norm(center - e["center"]) 
+            np.linalg.norm(center - e.center) 
             for e in previous_ellipsoids
         ])
         support = previous_ellipsoids[support_id]
 
-        sup_cov = support["eigvecs"] @ np.diag(support["eigvals"]) @ support["eigvecs"].T
+        sup_cov = support.eigvecs @ np.diag(support.eigvals) @ support.eigvecs.T
 
         alpha = min(1.0, len(X) / self.support_points)
         cov = alpha * own_cov + (1 - alpha) * sup_cov
@@ -77,29 +86,37 @@ class EllipsoidFitter:
 
         # singleton fallback scale
         if threshold == 0.0:
-            threshold = support["threshold"] * (1.0 - alpha)
+            threshold = support.threshold * (1.0 - alpha)
 
         eig_ratio = eigvals.max() / eigvals.min()
 
-        return center, eigvecs, eigvals, threshold, eig_ratio, support_id
+        return Ellipsoid(
+            center=center,
+            eigvecs=eigvecs,
+            eigvals=eigvals,
+            threshold=threshold,
+            eig_ratio=eig_ratio,
+            support_id=int(support_id),
+            weights=weights
+        )
 
     @staticmethod
-    def inside(X, center, eigvecs, eigvals, threshold):
-        diff = X - center
-        proj = diff @ eigvecs
-        d2 = np.sum((proj ** 2) / eigvals, axis=1)
-        return d2 <= threshold 
+    def inside(X, ellipsoid):
+        diff = X - ellipsoid.center
+        proj = diff @ ellipsoid.eigvecs
+        d2 = np.sum((proj ** 2) / ellipsoid.eigvals, axis=1)
+        return d2 <= ellipsoid.threshold 
     
     @staticmethod
-    def grow(X, center, eigvecs, eigvals, threshold, growth, min_growth=5e-3):
-        diff = X - center
-        proj = diff @ eigvecs
+    def grow(X, ellipsoid, growth, min_growth=5e-3):
+        diff = X - ellipsoid.center
+        proj = diff @ ellipsoid.eigvecs
 
-        var_ratio = eigvals / eigvals.max()
+        var_ratio = ellipsoid.eigvals / ellipsoid.eigvals.max()
         axis_growth = 1.0 + (growth - 1) * np.clip(var_ratio, min_growth, 1.0)
 
-        grown_eigvals = eigvals * (axis_growth ** 2)
+        grown_eigvals = ellipsoid.eigvals * (axis_growth ** 2)
 
         d2 = np.sum((proj ** 2) / grown_eigvals, axis=1)
-        return d2 <= threshold
+        return d2 <= ellipsoid.threshold
     
