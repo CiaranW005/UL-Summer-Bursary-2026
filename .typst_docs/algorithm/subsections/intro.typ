@@ -1,0 +1,5 @@
+= Statistical Modelling Algorithms
+
+This section investigates how the algorithm proposed by Tango Dias and Paula Amaral in _A Classification Method Based on a Cloud of Spheres_ @cloudspheres can be adapted for unsupervised anomaly detection. The original algorithm is first reinterpreted for the unsupervised setting before being extended to use ellipsoidal regions in place of hyperspheres.
+
+Several assumptions made in the original work are not directly applicable to high-dimensional (768-dimensional) Vision Transformer embeddings or to the unsupervised anomaly detection setting. Consequently, a number of modifications to the original algorithm are introduced. These adaptations are motivated throughout this chapter and their influence on both detection performance and interpretability is evaluated experimentally.
