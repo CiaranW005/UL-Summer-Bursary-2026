@@ -2,7 +2,7 @@
 
 This notebook explores the pretrained embeddings produced by the DINOv2 ViT-S/14 model (approximately 22 million parameters). DINOv2 is a self-supervised Vision Transformer that has demonstrated strong performance across a wide range of computer vision tasks, including anomaly detection.
 
-The model divides an image into 14×14 pixel patches and produces a global image representation through the CLS token. In addition, patch-level embeddings can be extracted to provide local representations of different image regions.
+The model divides an image into 14x14 pixel patches and produces a global image representation through the CLS token. In addition, patch-level embeddings can be extracted to provide local representations of different image regions.
 
 The purpose of this notebook is to:
 

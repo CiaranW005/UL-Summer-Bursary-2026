@@ -35,7 +35,7 @@ class CandidateCleaner:
             cand_axis_contrib = (cand_proj[:, bad_axis] ** 2) / ellipsoid.eigvals[bad_axis]
 
             worst_local = cand_axis_contrib.argmax()
-            weights = self.find_weight(X, weights, worst_local, uncovered_mask)
+            weights = self.find_weight(X, embeds, weights, worst_local, uncovered_mask)
 
             if np.isclose(weights[worst_local], 0.0, atol=1e-3):
                 covered_idx = np.delete(covered_idx, worst_local)
@@ -51,7 +51,7 @@ class CandidateCleaner:
         return ellipsoid
     
 
-    def find_weight(self, X, weights, worst_local, uncovered_mask, space=10):
+    def find_weight(self, X, embeds, weights, worst_local, uncovered_mask, space=10):
         lo = 0
         hi = weights[worst_local]
 
@@ -63,7 +63,7 @@ class CandidateCleaner:
             test_weights[worst_local] = mid
             ellipsoid = self.fitter.fit(X, test_weights)
 
-            inside_all = self.fitter.inside(X, ellipsoid)
+            inside_all = self.fitter.inside(embeds, ellipsoid)
             shared_idx = np.where((inside_all) & (~uncovered_mask))[0]
 
             if len(shared_idx) == 0:
