@@ -1,0 +1,3 @@
+(include mention of this paper in better estimating covariance as i used
+that for an idea for the cleaning formula and might use other things from it )
+(https://ieeexplore.ieee.org/document/6958867)

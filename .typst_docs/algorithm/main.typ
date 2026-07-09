@@ -15,4 +15,10 @@
 
 #include "subsections/07_cov_support.typ"
 
+#pagebreak()
+
+#include "subsections/08_results.typ"
+
+#include "subsections/09_future_work.typ"
+
 #bibliography("refs.bib")

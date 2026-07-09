@@ -1,7 +1,5 @@
 === Candidate cleaning
 
-(include mention of this paper in better estimating covariance)
-
 In the hypersphere algorithm, candidate cleaning was performed by iteratively removing the point that determined the current sphere radius. Since the radius is defined by the furthest point from the centroid, removing this point always reduces the size of the sphere and therefore the likelihood of overlap with previously assigned regions.
 
 This strategy does not naturally extend to ellipsoids. The size and orientation of an ellipsoid are jointly determined by its covariance matrix rather than by a single boundary point. Consequently, removing the embedding with the largest Mahalanobis distance does not necessarily reduce overlap with previously assigned ellipsoids, as that embedding may contribute little to the principal direction responsible for the overlap. Repeated deletion can therefore remove many embeddings before a satisfactory solution is obtained.
