@@ -2,8 +2,11 @@ import torch
 
 from tqdm import tqdm
 
-def get_embeddings(model, loader, device):
-    model.eval()
+def get_embeddings(dino, loader, device, model=None):
+    dino.eval()
+
+    if model is not None:
+        model.eval()
 
     cls_tokens = []
     all_patches = []
@@ -12,10 +15,13 @@ def get_embeddings(model, loader, device):
         for images in tqdm(loader):
             images = images.to(device)
             
-            features = model.forward_features(images)
+            features = dino.forward_features(images)
             cls = features["x_norm_clstoken"]
             patches = features["x_norm_patchtokens"]
 
+            if model is not None:
+                cls = model(cls)
+            
             cls_tokens.append(cls.cpu())
             all_patches.append(patches.cpu())
     
