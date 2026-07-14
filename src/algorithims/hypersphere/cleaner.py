@@ -1,6 +1,6 @@
 import numpy as np
 
-from .hypersphere import Hypersphere
+from ...types.hypersphere import Hypersphere
 
 class CandidateCleaner:
     @staticmethod

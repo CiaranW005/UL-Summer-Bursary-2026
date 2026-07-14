@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import faiss
 
-from .hypersphere import Hypersphere
+from ...types.hypersphere import Hypersphere
 
 class HypersphereCover:
     def __init__(self, cleaner):

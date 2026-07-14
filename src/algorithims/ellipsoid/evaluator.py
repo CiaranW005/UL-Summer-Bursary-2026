@@ -114,6 +114,7 @@ class EllipsoidEvaluator:
         results_df["n_points_bucket"] = pd.cut(
             results_df["winning_n_points"],
             bins=[0, 3, 5, 10, 100],
+            include_lowest=True
         )
 
         results_df["eigval_ratio_bucket"] = pd.qcut(
@@ -122,10 +123,54 @@ class EllipsoidEvaluator:
             duplicates="drop",
         )
 
+        n_points = (
+            results_df
+            .groupby("n_points_bucket", observed=False)["correct"]
+            .agg(["mean", "count"])
+        )
+
+        eig_ratio = (
+                results_df
+                .groupby("eigval_ratio_bucket", observed=False)["correct"]
+                .agg(["mean", "count"])
+            )
+
+        n_points_by_class = (
+            results_df
+            .groupby(
+                ["n_points_bucket", "y_true"],
+                observed=False,
+            )["correct"]
+            .agg(["mean", "count"])
+        )
+
+        bucket_aurocs = []
+
+        for bucket, group in results_df.groupby(
+            "eigval_ratio_bucket",
+            observed=False,
+        ):
+            if len(group) == 0 or group["y_true"].nunique() < 2:
+                auroc = None
+            else:
+                auroc = roc_auc_score(
+                    group["y_true"],
+                    group["score"],
+                )
+
+            bucket_aurocs.append({
+                "eigval_ratio_bucket": str(bucket),
+                "auroc": auroc,
+                "count": len(group),
+            })
+
+        eig_ratio_aurocs = pd.DataFrame(bucket_aurocs)
+ 
         return {
-            "n_points": results_df.groupby("n_points_bucket")["correct"].agg(["mean", "count"]),
-            "eig_ratio": results_df.groupby("eigval_ratio_bucket")["correct"].agg(["mean", "count"]),
-            "n_points_by_class": results_df.groupby(["n_points_bucket", "y_true"])["correct"].agg(["mean", "count"]),
+            "n_points": n_points,
+            "eig_ratio": eig_ratio,
+            "n_points_by_class": n_points_by_class,
+            "eig_ratio_aurocs": eig_ratio_aurocs,
         }
 
 

@@ -1,10 +1,12 @@
 from torch.utils.data import Dataset
 from PIL import Image
-from torchvision import transforms
+from pathlib import Path
 
 class ModelData(Dataset):
-    def __init__(self, paths, transform):
+    def __init__(self, paths, root, transform):
         self.paths = paths
+        self.root = Path(root) 
+
         self.transform = transform
 
     def __len__(self):
@@ -12,9 +14,9 @@ class ModelData(Dataset):
     
     def __getitem__(self, index):
         path = self.paths[index]
-        img = Image.open(path).convert("RGB")
+        img = Image.open(self.root/path).convert("RGB")
 
         view1 = self.transform(img)
         view2 = self.transform(img)
         
-        return view1, view2, index
+        return view1, view2

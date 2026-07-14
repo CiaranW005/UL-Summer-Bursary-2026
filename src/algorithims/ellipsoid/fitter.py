@@ -1,6 +1,6 @@
 import numpy as np
 
-from .ellipsoid import Ellipsoid
+from ...types import Ellipsoid
 
 class EllipsoidFitter:
     def __init__(self, support_points=5, reg=1e-4):

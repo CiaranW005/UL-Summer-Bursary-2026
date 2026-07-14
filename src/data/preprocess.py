@@ -5,7 +5,7 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-from ..config import DB_PATH
+from ..config.paths import DB_PATH
 
 img_transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -31,7 +31,7 @@ class ModelData(Dataset):
         if self.transform:
             img = self.transform(img)
         
-        return img, index
+        return img
 
 def preprocess():
     conn = sqlite3.connect(DB_PATH)

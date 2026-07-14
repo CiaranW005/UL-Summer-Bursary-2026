@@ -1,7 +1,7 @@
 from torch import nn
 
 class ProjectionHead(nn.Module):
-    def __int__(self, dim=768):
+    def __init__(self, dim=768):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(dim, dim),

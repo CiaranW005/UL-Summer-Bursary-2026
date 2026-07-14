@@ -1,7 +1,7 @@
 import faiss
 import torch
 
-from ..config import FAISS_IDX, EMBEDS_DIR
+from ..config.paths import FAISS_IDX, EMBEDS_DIR
 
 def build_index(embs):
     index = faiss.IndexFlatL2(embs.shape[1])

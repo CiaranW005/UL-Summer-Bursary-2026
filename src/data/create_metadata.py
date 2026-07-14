@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-from ..config import ROOT, DATA_DIR, DATASET_DIR, CSV_PATH
+from ..config.paths import ROOT, DATA_DIR, DATASET_DIR, CSV_PATH
 
 def create_metadata():
     images = []
