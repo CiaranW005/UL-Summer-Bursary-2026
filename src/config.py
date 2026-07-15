@@ -14,3 +14,4 @@ FAISS_DIR = DATA_DIR / "faiss"
 FAISS_IDX = FAISS_DIR / "embeds.index"
 
 MODEL_DIR = ROOT / "models"
+''
