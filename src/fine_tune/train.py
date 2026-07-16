@@ -1,12 +1,25 @@
 import torch
 
+from dataclasses import dataclass
+
+@dataclass
+class EmbeddingBatch:
+    org_view1: torch.Tensor
+    org_view2: torch.Tensor
+
+    proj_view1: torch.Tensor
+    proj_view2: torch.Tensor
+
+    categories: torch.Tensor
+
 def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
     model.train()
 
     total_loss = 0.0
 
-    for view1, view2 in dataloader:
+    for view1, view2, category in dataloader:
         view1, view2 = view1.to(device), view2.to(device)
+        category = category.to(device)
 
         optimizer.zero_grad()
 
@@ -20,8 +33,16 @@ def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
         z1 = model(emb1)
         z2 = model(emb2)
 
+        batch = EmbeddingBatch(
+            org_view1=emb1,
+            org_view2=emb2,
+            proj_view1=z1,
+            proj_view2=z2,
+            categories=category
+        )
+
         # Contrastive based loss
-        loss = criterion(z1, z2)
+        loss, components = criterion(batch)
         
         loss.backward()
         optimizer.step()
@@ -35,8 +56,9 @@ def evaluate(model, dino, dataloader, criterion, device):
 
     total_loss = 0.0
     with torch.no_grad():
-        for view1, view2 in dataloader:
+        for view1, view2, category in dataloader:
             view1, view2 = view1.to(device), view2.to(device)
+            category = category.to(device)
             
             with torch.no_grad():
                 emb1 = dino(view1)
@@ -45,7 +67,15 @@ def evaluate(model, dino, dataloader, criterion, device):
             z1 = model(emb1)
             z2 = model(emb2)
 
-            loss = criterion(z1, z2)
+            batch = EmbeddingBatch(
+                org_view1=emb1,
+                org_view2=emb2,
+                proj_view1=z1,
+                proj_view2=z2,
+                categories=category
+            )
+
+            loss, components = criterion(batch)
 
             total_loss += loss.item()
 

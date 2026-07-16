@@ -13,7 +13,7 @@ from .extract_embs import get_embeddings
 from .build_faiss import build_index
 
 if __name__ == "__main__":
-    base_dir = EMBEDS_DIR / "base_embeds"
+    base_dir = EMBEDS_DIR / "cont_embeds"
 
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(base_dir, exist_ok=True)
