@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -6,20 +7,41 @@ Used to preserve how much info from base model(Dino)
 Based on how similar embeddings are to the old ones
 """
 class PreservationLoss(nn.Module):
-    def __int__(self):
+    def __init__(self, sim_weight = 1.0, norm_weight = 1.0, eps = 1e-8):
         super().__init__()
+        self.sim_weight = sim_weight
+        self.norm_weight = norm_weight
+
+        self.eps = eps
 
     def forward(self, org_embeds, proj_embeds):
-        org_sim = F.normalize(org_embeds, dim=-1)
-        org_sim = org_sim @ org_sim.T
+        org_embeds = org_embeds.detach()
 
-        proj_sim = F.normalize(proj_embeds, dim=-1)
-        proj_sim = proj_sim @ proj_sim.T
+        org_norm = org_embeds.norm(
+            dim=-1,
+            keepdim=True,
+        ).clamp_min(self.eps)
 
-        return F.mse_loss(
-            proj_sim,
-            org_sim.detach()
+        proj_norm = proj_embeds.norm(
+            dim=-1,
+            keepdim=True,
+        ).clamp_min(self.eps)
+    
+        org_unit = org_embeds / org_norm
+        proj_unit = proj_embeds / proj_norm
+
+        org_sim = org_unit @ org_unit.T
+        proj_sim = proj_unit @ proj_unit.T
+
+        similarity_loss = F.mse_loss(proj_sim, org_sim)
+
+        norm_ratio = proj_norm / org_norm
+
+        norm_loss = F.mse_loss(norm_ratio, torch.ones_like(norm_ratio))
+
+        return (
+            self.similarity_weight * similarity_loss
+            + self.norm_weight * norm_loss
         )
-
 
     

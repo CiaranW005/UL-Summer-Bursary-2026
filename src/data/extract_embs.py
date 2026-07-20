@@ -8,7 +8,8 @@ def get_embeddings(dino, loader, device, model=None):
     if model is not None:
         model.eval()
 
-    cls_tokens = []
+    base_tokens = []
+    projected_tokens = []
     all_patches = []
 
     with torch.no_grad():
@@ -16,16 +17,21 @@ def get_embeddings(dino, loader, device, model=None):
             images = images.to(device)
             
             features = dino.forward_features(images)
-            cls = features["x_norm_clstoken"]
+            base_cls = features["x_norm_clstoken"]
             patches = features["x_norm_patchtokens"]
 
             if model is not None:
-                cls = model(cls)
-            
-            cls_tokens.append(cls.cpu())
+                projected_cls = model(base_cls)
+            else:
+                projected_cls = base_cls
+
+            base_tokens.append(base_cls.cpu())
+            projected_tokens.append(projected_cls.cpu())
             all_patches.append(patches.cpu())
     
-    cls_tokens = torch.cat(cls_tokens).numpy().astype("float32")
+    base_tokens = torch.cat(base_tokens).numpy().astype("float32")
+    projected_tokens = torch.cat(projected_tokens).numpy().astype("float32")
+
     all_patches = torch.cat(all_patches).numpy().astype("float32")
     
-    return cls_tokens, all_patches
+    return base_tokens, projected_tokens, all_patches
