@@ -14,8 +14,8 @@ class CategoryContLoss(nn.Module):
     ):
         embeddings = F.normalize(embeddings, dim=-1)
 
-        logits = embeddings @ embeddings.T
-        logits = logits / self.temperature
+        similarities = embeddings @ embeddings.T
+        logits = similarities / self.temperature
 
         batch_size = embeddings.shape[0]
 
@@ -27,7 +27,18 @@ class CategoryContLoss(nn.Module):
 
         positive_mask = labels[:, None] == labels[None, :]
         positive_mask = positive_mask & ~self_mask
+        
+        negative_mask = labels[:, None] != labels[None, :]
 
+        with torch.no_grad():
+            same_sim = similarities[positive_mask].mean()
+            diff_sim = similarities[negative_mask].mean()
+
+            print(
+                f"same={same_sim.item():.4f}, "
+                f"different={diff_sim.item():.4f}, "
+                f"gap={(same_sim - diff_sim).item():.4f}"
+            )
         logits = logits.masked_fill(self_mask, float("-inf"))
 
         log_prob = logits - torch.logsumexp(

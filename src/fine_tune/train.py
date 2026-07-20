@@ -45,8 +45,23 @@ def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
         loss, components = criterion(batch)
         
         loss.backward()
+
+        grad_norm = 0.0
+
+        for parameter in model.parameters():
+            if parameter is not None:
+                grad_norm += parameter.grad.norm().item()  ** 2
+
+        grad_norm = grad_norm ** 0.5
+        print("Gradient Norm:", grad_norm)
+
+        before = next(model.parameters()).detach().clone()
+
         optimizer.step()
 
+        after = next(model.parameters()).detach().clone()
+
+        print("Paramter change:", (after - before).abs().mean().item())
         total_loss += loss.item()
 
     return total_loss / len(dataloader)

@@ -12,6 +12,11 @@ class ModelData(Dataset):
         self.category_to_id = category_to_id
         self.transform = transform
 
+        self.labels = [
+            self.category_to_id[get_category(self.root / path)]
+            for path in self.paths
+        ]
+
     def __len__(self):
         return len(self.paths)
     
@@ -22,7 +27,4 @@ class ModelData(Dataset):
         view1 = self.transform(img)
         view2 = self.transform(img)
 
-        category = get_category(path)
-        category_id = self.category_to_id[category]
-
-        return view1, view2, category_id
+        return view1, view2, self.labels[index]
