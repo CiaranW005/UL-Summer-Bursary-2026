@@ -1,13 +1,16 @@
 import os
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse, Circle
+import plotly.graph_objects as go
 
 import faiss
 
 from pathlib import Path
 from .dim_reduction.utils import *
+from .utils import sphere_surface
 
 def plot_ellipsoid(
+        cls_tokens,
         masks,     
         output_dir: Path, 
         cache_dir: Path 
@@ -16,7 +19,7 @@ def plot_ellipsoid(
     img_dir = output_dir / "mahlanobis_fit" 
     os.makedirs(img_dir, exist_ok=True)
 
-    pca_2d, _ = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca)
+    pca_2d, _ = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca, cls_tokens)
     pca_train = pca_2d[masks.train_mask]
     pca_test = pca_2d[masks.test_mask]
 
@@ -72,7 +75,7 @@ def plot_K(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     train_emb = cls_tokens[masks.train_mask]
     cat_emb = train_emb[masks.train_category_mask]
     
-    pca_2d, _ = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca)
+    pca_2d, _ = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca, cls_tokens)
     pca_train = pca_2d[masks.train_mask]
     pca_cat = pca_train[masks.train_category_mask]
 
@@ -145,7 +148,7 @@ def plot_growth_rates(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     train_emb = cls_tokens[masks.train_mask]
     cat_emb = train_emb[masks.train_category_mask]
 
-    pca_2d, pca = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca)
+    pca_2d, pca = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca, cls_tokens)
     pca_train = pca_2d[masks.train_mask]
     pca_cat = pca_train[masks.train_category_mask]
 
@@ -249,11 +252,11 @@ def plot_growth_rates(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     plt.savefig(f"{img_dir}/{masks.category}.svg", bbox_inches="tight")
     plt.show()
 
-def plot_sphere_cover(masks, spheres, output_dir : Path, cache_dir : Path):
+def plot_sphere_cover(cls_tokens, masks, spheres, output_dir : Path, cache_dir : Path):
     img_dir = output_dir / "sphere_plot"
     os.makedirs(img_dir, exist_ok=True)
 
-    pca_2d, pca = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca)
+    pca_2d, pca = load_or_compute(cache_dir / "cls_pca.npy", cache_dir / "pca.joblib", compute_pca, cls_tokens)
     pca_train = pca_2d[masks.train_mask]
     pca_cat = pca_train[masks.train_category_mask]
 
@@ -295,3 +298,101 @@ def plot_sphere_cover(masks, spheres, output_dir : Path, cache_dir : Path):
 
     plt.savefig(f"{img_dir}/{masks.category}.svg")
     plt.show()
+
+
+def plot_3d_sphere_cover(cls_tokens, masks, spheres, output_dir : Path, cache_dir : Path):
+    rng = np.random.default_rng(42)
+
+    pca_3d, pca = load_or_compute(cache_dir / "cls_pca_3d.npy", cache_dir / "pca_3d.joblib", compute_pca_3d, cls_tokens)
+    pca_train = pca_3d[masks.train_mask]
+    pca_cat = pca_train[masks.train_category_mask]
+
+    colours = [
+        f"rgb({r},{g},{b})"
+        for r, g, b in rng.integers(30, 255, size=(len(spheres), 3))
+    ]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter3d(
+        x=pca_cat[:, 0],
+        y=pca_cat[:, 1],
+        z=pca_cat[:, 2],
+        mode="markers",
+        marker=dict(size=3, opacity=0.35),
+        name="all screw train"
+    ))
+
+    for i, s in enumerate(spheres):
+        idx = s.covered_idx
+        pts = pca_cat[idx]
+
+        center_3d = pts.mean(axis=0)
+        radius_3d = np.linalg.norm(pts - center_3d).max()
+
+        fig.add_trace(go.Scatter3d(
+            x=pts[:, 0],
+            y=pts[:, 1],
+            z=pts[:, 2],
+            mode="markers",
+            marker=dict(size=4, color=colours[i]),
+            name=f"sphere {i+1}",
+            legendgroup=f"sphere{i}"
+        ))
+
+        fig.add_trace(go.Scatter3d(
+            x=[center_3d[0]],
+            y=[center_3d[1]],
+            z=[center_3d[2]],
+            mode="markers",
+            marker=dict(size=7, symbol="x", color=colours[i]),
+            name=f"center {i+1}",
+            showlegend=False,
+            legendgroup=f"sphere{i}"
+        ))
+
+        xs, ys, zs = sphere_surface(center_3d, radius_3d, resolution=20)
+
+        fig.add_trace(go.Surface(
+            x=xs,
+            y=ys,
+            z=zs,
+            opacity=0.12,
+            showscale=False,
+            name=f"Boundary {i+1}",
+            legendgroup=f"sphere{i}",
+            showlegend=False
+        ))
+
+    fig.update_layout(
+        title="3D PCA multi-sphere assignment view",
+        scene=dict(
+            xaxis_title="PC1",
+            yaxis_title="PC2",
+            zaxis_title="PC3"
+        ),
+        width=900,
+        height=750,
+        updatemenus=[
+        dict(
+            type="buttons",
+            buttons=[
+                dict(
+                    label="Show All",
+                    method="update",
+                    args=[{"visible": [True] * len(fig.data)}]
+                ),
+                dict(
+                    label="Hide All",
+                    method="update",
+                    args=[{"visible": ["legendonly"] * len(fig.data)}]
+                )
+            ],
+            x=1.15,
+            y=0
+        )
+        ]
+    )
+
+    fig.show()
+    fig.write_image(output_dir / "3d_hypersphere_plot.svg")

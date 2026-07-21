@@ -16,10 +16,10 @@ class CombinedLoss(nn.Module):
         self.weights = weights
 
         if enabled.get("category_cont", False):
-            self.losses["category_cont"] = CategoryContLoss()
+            self.losses["category_cont"] = CategoryContLoss(temperature=0.1)
 
         if enabled.get("preservation", False):
-            self.losses["preservation"] = PreservationLoss()
+            self.losses["preservation"] = PreservationLoss(sim_weight=1.0, norm_weight=1.0, eps=1e-8)
 
         if len(self.losses) == 0:
             raise ValueError("At least one loss must be enabled.")

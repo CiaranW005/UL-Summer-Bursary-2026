@@ -57,8 +57,8 @@ if __name__ == "__main__":
     print(f"cls_tokens Shape: {projected_cls.shape}")
     print(f"Patches Shape: {patches.shape}")
 
-    # torch.save(projected_cls, base_dir / "cls.pt")
-    # torch.save(patches, base_dir / "patch.pt")
+    torch.save(projected_cls, base_dir / "cls.pt")
+    torch.save(patches, base_dir / "patch.pt")
 
     build_index(embs=projected_cls)
 

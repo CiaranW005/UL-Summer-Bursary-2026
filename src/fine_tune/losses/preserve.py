@@ -40,7 +40,7 @@ class PreservationLoss(nn.Module):
         norm_loss = F.mse_loss(norm_ratio, torch.ones_like(norm_ratio))
 
         return (
-            self.similarity_weight * similarity_loss
+            self.sim_weight * similarity_loss
             + self.norm_weight * norm_loss
         )
 
