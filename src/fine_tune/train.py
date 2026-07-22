@@ -4,15 +4,22 @@ from dataclasses import dataclass
 
 @dataclass
 class EmbeddingBatch:
-    org_view1: torch.Tensor
-    org_view2: torch.Tensor
-
     proj_view1: torch.Tensor
     proj_view2: torch.Tensor
 
     categories: torch.Tensor
 
-def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
+    org_view1: torch.Tensor | None = None
+    org_view2: torch.Tensor | None = None
+
+    negatives : torch.Tensor | None = None
+
+def run_models(x, models):
+    for model in models:
+        x = model(x)
+    return x
+
+def train_one_epoch(model, inf_models, dataloader, criterion, optimizer, device):
     model.train()
 
     total_loss = 0.0
@@ -25,19 +32,20 @@ def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
 
         # Get embeddings from frozen dino
         with torch.no_grad():
-            emb1 = dino(view1)
-            emb2 = dino(view2)
+            emb1 = run_models(view1, inf_models)
+            emb2 = run_models(view2, inf_models)
 
 
         # Embeddings from the projection head 
         z1 = model(emb1)
         z2 = model(emb2)
 
+        z_negs = model(criterion.negatives)
+
         batch = EmbeddingBatch(
-            org_view1=emb1,
-            org_view2=emb2,
             proj_view1=z1,
             proj_view2=z2,
+            negatives=z_negs,
             categories=category
         )
 
@@ -66,7 +74,7 @@ def train_one_epoch(model, dino, dataloader, criterion, optimizer, device):
 
     return total_loss / len(dataloader)
 
-def evaluate(model, dino, dataloader, criterion, device):
+def evaluate(model, inf_models, dataloader, criterion, device):
     model.eval()
 
     total_loss = 0.0
@@ -76,17 +84,18 @@ def evaluate(model, dino, dataloader, criterion, device):
             category = category.to(device)
             
             with torch.no_grad():
-                emb1 = dino(view1)
-                emb2 = dino(view2)
+                emb1 = run_models(view1, inf_models)
+                emb2 = run_models(view2, inf_models)
 
             z1 = model(emb1)
             z2 = model(emb2)
 
+            z_negs = model(criterion.negatives)
+
             batch = EmbeddingBatch(
-                org_view1=emb1,
-                org_view2=emb2,
                 proj_view1=z1,
                 proj_view2=z2,
+                negatives=z_negs,
                 categories=category
             )
 
