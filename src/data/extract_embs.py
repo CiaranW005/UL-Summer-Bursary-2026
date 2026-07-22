@@ -1,16 +1,26 @@
 import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
 
 from tqdm import tqdm
+from dataclasses import dataclass, field
 
-def get_embeddings(dino, loader, device, model=None):
-    dino.eval()
+@dataclass
+class Embeddings:
+    base_cls: list[torch.Tensor] = field(default_factory=list)
+    projected_cls: list[torch.Tensor] = field(default_factory=list)
+    patches: list[torch.Tensor] = field(default_factory=list)
 
-    if model is not None:
+def get_embeddings(
+        dino: nn.Module, 
+        loader: DataLoader, 
+        device: torch.device, 
+        models: list[nn.Module]):
+
+    for model in models:
         model.eval()
 
-    base_tokens = []
-    projected_tokens = []
-    all_patches = []
+    embeds = Embeddings()
 
     with torch.no_grad():
         for images in tqdm(loader):
@@ -20,18 +30,17 @@ def get_embeddings(dino, loader, device, model=None):
             base_cls = features["x_norm_clstoken"]
             patches = features["x_norm_patchtokens"]
 
-            if model is not None:
-                projected_cls = model(base_cls)
-            else:
-                projected_cls = base_cls
+            projected_cls = base_cls
+            for model in models:
+                projected_cls = model(projected_cls)
 
-            base_tokens.append(base_cls.cpu())
-            projected_tokens.append(projected_cls.cpu())
-            all_patches.append(patches.cpu())
+            embeds.base_cls.append(base_cls.cpu())
+            embeds.projected_cls.append(projected_cls.cpu())
+            embeds.patches.append(patches.cpu())
     
-    base_tokens = torch.cat(base_tokens).numpy().astype("float32")
-    projected_tokens = torch.cat(projected_tokens).numpy().astype("float32")
+    base_cls = torch.cat(embeds.base_cls).numpy().astype("float32")
+    projected_cls = torch.cat(embeds.projected_cls).numpy().astype("float32")
 
-    all_patches = torch.cat(all_patches).numpy().astype("float32")
+    patches = torch.cat(embeds.patches).numpy().astype("float32")
     
-    return base_tokens, projected_tokens, all_patches
+    return base_cls, projected_cls, patches

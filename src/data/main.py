@@ -2,10 +2,13 @@
 
 import os
 import torch
+import torch.nn as nn
 
+from typing import Literal
+from pathlib import Path
 import numpy as np
 
-from ..config.paths import MODEL_DIR, EMBEDS_DIR, FAISS_DIR
+from ..config.paths import MODELS, EMBEDS_DIR, FAISS_DIR
 from ..fine_tune.model import ProjectionHead
 
 from .create_metadata import create_metadata
@@ -14,16 +17,107 @@ from .preprocess import preprocess
 from .extract_embs import get_embeddings
 from .build_faiss import build_index
 
+EmbeddingMode = Literal[
+    "dino",
+    "category_head",
+    "anomaly_head"
+]
+
+EMBEDDING_MODE: EmbeddingMode = "anomaly_head"
+
+def get_latest_checkpoint(dir: Path) -> Path:
+    if not dir.exists():
+        raise FileNotFoundError(
+            f"Checkpoint directory does not exist: {dir}"
+        )
+    
+    checkpoints = [
+        path for path in dir.iterdir()
+        if path.is_file()
+    ]
+
+    if not checkpoints:
+        raise FileNotFoundError(
+            f"No checkpoints found in {dir}"
+        )
+
+    return max(
+        checkpoints,
+        key=lambda path: path.stat().st_mtime
+    )
+
+def load_projection_head(
+        checkpoint_dir: Path,
+        device : torch.device,
+    ) -> nn.Module:
+    model_path = get_latest_checkpoint(checkpoint_dir)
+
+    print("Loading Checkpoint:", model_path)
+
+    checkpoint = torch.load(
+        model_path,
+        map_location=device,
+        weights_only=True
+    )
+
+    parameters = checkpoint["model_info"]["parameters"]
+
+    model = ProjectionHead(
+        dim=parameters["model_dim"],
+        hidden_dim=parameters["hidden_dim"],
+        norm_type=parameters["model_normaliser"]
+    )
+
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    model.to(device)
+    model.eval()
+
+    return model
+
+def load_embedding_model(
+        mode : EmbeddingMode,
+        device: torch.device
+) -> list[nn.Module]:
+    if mode == "dino":
+        return []
+
+    if mode == "category_head":
+        return [load_projection_head(
+            checkpoint_dir=MODELS / "category_head",
+            device=device
+        )]
+
+    if mode == "anomaly_head":
+        category_head = load_projection_head(
+            checkpoint_dir=MODELS / "category_head",
+            device=device
+        )
+
+        anomaly_head  = load_projection_head(
+            checkpoint_dir=MODELS / "anomaly_head",
+            device=device
+        )
+
+        return [category_head, anomaly_head]
+
+    raise ValueError(
+        f"Unknown embedding mode: {mode}"
+    )
+
+
+def output_directory(
+    mode: EmbeddingMode,
+) -> Path:
+    return EMBEDS_DIR / f"{mode}_embeds"
+
 if __name__ == "__main__":
-    base_dir = EMBEDS_DIR / "cont_embeds"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    output_dir = output_directory(EMBEDDING_MODE)
 
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    os.makedirs(base_dir, exist_ok=True)
+    os.makedirs(MODELS, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    print(f"Device: {device}")
 
     dino = torch.hub.load(
             "facebookresearch/dinov2",
@@ -31,34 +125,27 @@ if __name__ == "__main__":
         )
     
     dino.to(device)
+    dino.eval()
 
-    if any(MODEL_DIR.iterdir()):
-        model_path = max(MODEL_DIR.iterdir(), key=lambda p: p.stat().st_mtime)
-        print(model_path)
-        
-        checkpoint = torch.load(model_path, weights_only=True)
-        parameters = checkpoint["model_info"]["parameters"]
-
-        model = ProjectionHead(dim=parameters["model_dim"], hidden_dim=parameters["hidden_dim"], norm_type=parameters["model_normaliser"])
-        model.load_state_dict(checkpoint["model_state_dict"])
-
-        model.to(device)
-    else:
-        model = None
+    embedding_models = load_embedding_model(
+        mode=EMBEDDING_MODE,
+        device=device
+    )
 
     create_metadata()
     build_metadata_db()
+
     loader = preprocess()
 
     print(f"Images: {len(loader.dataset)}")
 
-    base_cls, projected_cls, patches = get_embeddings(dino=dino, model=model, loader=loader, device=device)
+    base_cls, projected_cls, patches = get_embeddings(dino=dino, models=embedding_models, loader=loader, device=device)
 
     print(f"cls_tokens Shape: {projected_cls.shape}")
     print(f"Patches Shape: {patches.shape}")
 
-    torch.save(projected_cls, base_dir / "cls.pt")
-    torch.save(patches, base_dir / "patch.pt")
+    torch.save(projected_cls, output_dir / "cls.pt")
+    torch.save(patches, output_dir / "patch.pt")
 
     build_index(embs=projected_cls)
 
