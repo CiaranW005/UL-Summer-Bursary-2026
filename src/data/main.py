@@ -8,6 +8,8 @@ from typing import Literal
 from pathlib import Path
 import numpy as np
 
+from typing import cast 
+
 from ..config.paths import MODELS, EMBEDS_DIR, FAISS_DIR
 from ..fine_tune.model import ProjectionHead
 
@@ -119,10 +121,10 @@ if __name__ == "__main__":
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
 
-    dino = torch.hub.load(
-            "facebookresearch/dinov2",
-            "dinov2_vits14"
-        )
+    dino = cast(nn.Module, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
+            repo_or_dir="facebookresearch/dinov2",
+            model="dinov2_vits14"
+        ))
     
     dino.to(device)
     dino.eval()
@@ -137,7 +139,7 @@ if __name__ == "__main__":
 
     loader = preprocess()
 
-    print(f"Images: {len(loader.dataset)}")
+    print(f"Images: {loader.dataset}")
 
     base_cls, projected_cls, patches = get_embeddings(dino=dino, models=embedding_models, loader=loader, device=device)
 

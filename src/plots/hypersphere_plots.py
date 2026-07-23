@@ -5,13 +5,19 @@ import plotly.graph_objects as go
 
 import faiss
 
+from collections.abc import Sequence
+from typing import cast
+
 from pathlib import Path
 from .dim_reduction.utils import *
 from .utils import sphere_surface
 
+from ..algorithims.types import CategoryMasks, Hypersphere
+
+# TODO: Refactor to stop repeating a lot of the code
 def plot_ellipsoid(
-        cls_tokens,
-        masks,     
+        cls_tokens: np.ndarray,
+        masks: CategoryMasks,     
         output_dir: Path, 
         cache_dir: Path 
         ):
@@ -68,7 +74,12 @@ def plot_ellipsoid(
     plt.savefig(f"{img_dir}/{masks.category}.svg")
     plt.show()
 
-def plot_K(masks, cls_tokens, output_dir: Path, cache_dir: Path):
+def plot_K(
+        masks: CategoryMasks, 
+        cls_tokens: np.ndarray, 
+        output_dir: Path, 
+        cache_dir: Path
+    ):
     img_dir = output_dir / "k_rate"
     os.makedirs(img_dir, exist_ok=True)
 
@@ -84,25 +95,25 @@ def plot_K(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     fig, axes = plt.subplots(1, 3, figsize=(10, 6))
 
     for i, frac in enumerate([0.025, 0.05, 0.10]):
-        K = max(2, int(frac * len(cat_emb)))
+        k = max(2, int(frac * len(cat_emb)))
 
         index = faiss.IndexFlatL2(cat_emb.shape[1])
         index.add(cat_emb.astype("float32"))
 
-        D, I = index.search(
+        dists, nbrs = index.search(
             cat_emb.astype("float32"),
-            k=K+1 # Nearest is itself
+            k=k+1 # Nearest is itself
         )
 
-        D = D[:, 1:]    # Remove self
-        I = I[:, 1:]
+        dists = dists[:, 1:]    # Remove self
+        nbrs = nbrs[:, 1:]
 
-        avg_knn = D.mean(axis=1)
+        avg_knn = dists.mean(axis=1)
 
         most_compact_idx = avg_knn.argmin()
-        neighbours = I[most_compact_idx]
+        neighbours = nbrs[most_compact_idx]
 
-        center_2d = pca_cat[most_compact_idx]
+        center_2d = cast(tuple[float, float], pca_cat[most_compact_idx])
 
         neighbours_2d = pca_cat[neighbours]
         radius_2d = np.linalg.norm(neighbours_2d - center_2d, axis=1).max()
@@ -120,11 +131,11 @@ def plot_K(masks, cls_tokens, output_dir: Path, cache_dir: Path):
         )
 
         ax.add_patch(circle)
-        ax.set_title(f"K={K} ({frac*100:.1f}%)")
+        ax.set_title(f"K={k} ({frac*100:.1f}%)")
         ax.set_aspect("equal", adjustable="box")
 
         print("frac:", frac)
-        print("K:", K)
+        print("K:", k)
         print("most compact idx:", most_compact_idx)
         print("avg KNN dist:", avg_knn[most_compact_idx])
 
@@ -141,7 +152,13 @@ def plot_K(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     plt.savefig(f"{img_dir}/{masks.category}.svg", bbox_inches="tight")
     plt.show()
 
-def plot_growth_rates(masks, cls_tokens, output_dir: Path, cache_dir: Path):
+def plot_growth_rates(
+        masks: CategoryMasks, 
+        cls_tokens: np.ndarray, 
+        output_dir: Path, 
+        cache_dir: Path
+        ):
+    
     img_dir = output_dir/ "growth_rate"
     os.makedirs(img_dir, exist_ok=True)
 
@@ -162,21 +179,21 @@ def plot_growth_rates(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     index = faiss.IndexFlatL2(cat_emb.shape[1])
     index.add(cat_emb.astype("float32"))
 
-    D, I = index.search(
+    dists, nbrs = index.search(
         cat_emb.astype("float32"),
         k=K+1 # Nearest is itself
     )
 
-    D = D[:, 1:]    # Remove self
-    I = I[:, 1:]
+    dists = dists[:, 1:]    # Remove self
+    nbrs = nbrs[:, 1:]
 
-    avg_knn = D.mean(axis=1)
+    avg_knn = dists.mean(axis=1)
 
     most_compact_idx = avg_knn.argmin()
-    neighbours = I[most_compact_idx]
+    neighbours = nbrs[most_compact_idx]
 
     center = cat_emb[most_compact_idx]
-    radius = np.sqrt(D[most_compact_idx, -1])
+    radius = np.sqrt(dists[most_compact_idx, -1])
 
     distances = np.linalg.norm(cat_emb - center, axis=1)
 
@@ -252,7 +269,13 @@ def plot_growth_rates(masks, cls_tokens, output_dir: Path, cache_dir: Path):
     plt.savefig(f"{img_dir}/{masks.category}.svg", bbox_inches="tight")
     plt.show()
 
-def plot_sphere_cover(cls_tokens, masks, spheres, output_dir : Path, cache_dir : Path):
+def plot_sphere_cover(
+        cls_tokens: np.ndarray, 
+        masks: CategoryMasks, 
+        spheres: Sequence[Hypersphere], 
+        output_dir : Path, 
+        cache_dir : Path
+        ):
     img_dir = output_dir / "sphere_plot"
     os.makedirs(img_dir, exist_ok=True)
 
@@ -300,10 +323,16 @@ def plot_sphere_cover(cls_tokens, masks, spheres, output_dir : Path, cache_dir :
     plt.show()
 
 
-def plot_3d_sphere_cover(cls_tokens, masks, spheres, output_dir : Path, cache_dir : Path):
+def plot_3d_sphere_cover(
+        cls_tokens: np.ndarray, 
+        masks: CategoryMasks, 
+        spheres: Sequence[Hypersphere], 
+        output_dir : Path, 
+        cache_dir : Path
+        ):
     rng = np.random.default_rng(42)
 
-    pca_3d, pca = load_or_compute(cache_dir / "cls_pca_3d.npy", cache_dir / "pca_3d.joblib", compute_pca_3d, cls_tokens)
+    pca_3d, _ = load_or_compute(cache_dir / "cls_pca_3d.npy", cache_dir / "pca_3d.joblib", compute_pca_3d, cls_tokens)
     pca_train = pca_3d[masks.train_mask]
     pca_cat = pca_train[masks.train_category_mask]
 

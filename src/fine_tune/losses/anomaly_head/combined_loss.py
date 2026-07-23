@@ -3,13 +3,15 @@ import torch.nn as nn
 
 from .supervisedcontloss import AnomalyCategoryContLoss
 
+from ...types import EmbeddingBatch
+
 class CombinedLoss(nn.Module):
     def __init__(
             self, 
             enabled: dict[str, bool],
             weights: dict[str, float],
-            negatives,
-            negative_labels
+            negatives: list[torch.Tensor],
+            negative_labels: list[int]
         ):
         super().__init__()
 
@@ -25,15 +27,16 @@ class CombinedLoss(nn.Module):
         if len(self.losses) == 0:
             raise ValueError("At least one loss must be enabled.")
 
-    def forward(self, batch):
+    def forward(self, batch: EmbeddingBatch) -> tuple[torch.Tensor, dict[str, int]]:
         total_loss = batch.proj_view1.new_tensor(0.0)
-        components = {}
+        components: dict[str, int] = {}
 
         if "cont_loss" in self.losses:
             projected = torch.cat([batch.proj_view1, batch.proj_view2], dim=0)
             categories = torch.cat([batch.categories, batch.categories], dim=0)
 
-            category_loss = self.losses["cont_loss"](projected, categories, batch.negatives, self.negative_labels)
+            # TODO: Return cosines for logging
+            category_loss, _ = self.losses["cont_loss"](projected, categories, batch.negatives, self.negative_labels)
 
             total_loss = total_loss + self.weights.get("category_cont", 1.0) * category_loss
 

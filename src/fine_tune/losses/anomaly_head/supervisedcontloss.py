@@ -2,18 +2,34 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from typing import cast
+
 class AnomalyCategoryContLoss(nn.Module):
-    def __init__(self, temperature = 0.1):
+    """
+    Contrastive loss that learns category-specific normal embeddings while
+    treating matched anomalies as negatives.
+
+    Normal samples from the same category are pulled together. Normal samples
+    from different categories and anomalies belonging to the corresponding
+    category contribute to the denominator, encouraging the model to separate
+    anomalous representations and further separate normal representations.
+    """
+
+    def __init__(self, temperature: float = 0.1):
         super().__init__()
         self.temperature = temperature
 
     def forward(self, 
-                norm_embeds, norm_labels,
-                anom_embeds, anom_labels
-                ):
+                norm_embeds: torch.Tensor, 
+                norm_labels: torch.Tensor,
+                anom_embeds: torch.Tensor, 
+                anom_labels: torch.Tensor
+            )-> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         norm_embeds = F.normalize(norm_embeds, dim=-1)
         anom_embeds = F.normalize(anom_embeds, dim=-1)
 
+        # Pairwise cosine similarities between normal samples and between 
+        # normal and anomalous samples
         norm_sim = norm_embeds @ norm_embeds.T
         anom_sim = norm_embeds @ anom_embeds.T
 
@@ -25,30 +41,34 @@ class AnomalyCategoryContLoss(nn.Module):
             device=norm_embeds.device
         )
 
+        # Positive pairs are normal samples from the same category, excluding self-comparisons
         positive_mask = (
             norm_labels[:, None] == norm_labels[None, :]
         ) & ~self_mask
 
-
+        # Normal samples belonging to different categories
         other_category_mask = (
             norm_labels[:, None] != norm_labels[None, :]
         )
 
-        negative_mask = (
+        # Anomalies belonging to the same category as each normal sample
+        matched_anomaly = (
             norm_labels[:, None] == anom_labels[None, :]
         ) 
 
         norm_logits = norm_sim / self.temperature
         anom_logits = anom_sim / self.temperature
 
+        # Exclude self-comparisons and unrelated anomaly categories from the contrastive denominator.
         norm_logits = norm_logits.masked_fill(self_mask, float("-inf"))
-        anom_logits = anom_logits.masked_fill(~negative_mask, float("-inf"))
+        anom_logits = anom_logits.masked_fill(~matched_anomaly, float("-inf"))
 
         all_logits = torch.cat(
             [norm_logits, anom_logits],
             dim=1
         )
 
+        # Compute the InfoNCE normalised term over normal samples and matched anomalies
         log_denominator = torch.logsumexp(
             all_logits,
             dim=1,
@@ -63,28 +83,38 @@ class AnomalyCategoryContLoss(nn.Module):
         valid = positive_count > 0
 
         if not valid.any():
-            return norm_embeds.sum() * 0.0
+            unique, counts = cast(torch.Tensor, torch.unique(norm_labels, return_counts=True)) # pyright: ignore[reportUnknownMemberType]
 
+            raise RuntimeError(
+                "No positive pairs found.\n"
+                f"Batch size: {len(norm_labels)}\n"
+                f"Unique labels: {unique.tolist()}\n" # pyright: ignore[reportUnknownMemberType]
+                f"Counts: {counts.tolist()}" # pyright: ignore[reportUnknownMemberType]
+            )
+
+        # Avergae the log-probability acorss all positive pairs for each anchor
         mean_pos_log_prob = (
             positive_log_prob.sum(dim=1) / positive_count.clamp_min(1)
         )
 
+        # Log cosine similarities to monitor representation during training
         with torch.no_grad():
             same_sim = norm_sim[positive_mask].mean()
 
+            # How similar categories are to other categories
             other_normal_sim = norm_sim[
                 other_category_mask
             ].mean()
 
-            if negative_mask.any():
-                matched_anomaly_sim = anom_sim[negative_mask].mean()
+            if matched_anomaly.any():
+                matched_anomaly_sim = anom_sim[matched_anomaly].mean()
             else:
                 matched_anomaly_sim = torch.tensor(float("nan"), device=norm_embeds.device)
 
-            print(
-                f"same_normal={same_sim.item():.4f}, "
-                f"other_normal={other_normal_sim.item():.4f}, "
-                f"matched_anomaly={matched_anomaly_sim.item():.4f}"
-            )
+            cosines = {
+                "normal": same_sim,
+                "other_normal": other_normal_sim,
+                "matched_anomaly": matched_anomaly_sim
+            }
 
-        return -mean_pos_log_prob[valid].mean()
+        return -mean_pos_log_prob[valid].mean(), cosines

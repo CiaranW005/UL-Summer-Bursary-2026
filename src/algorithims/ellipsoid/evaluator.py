@@ -4,10 +4,19 @@ import pandas as pd
 
 from sklearn.metrics import roc_auc_score, roc_curve
 
+from collections.abc import Sequence
+
+from ..types import Ellipsoid, EllipsoidOverlapResult, BucketAUROC
+
 class EllipsoidEvaluator:
     @staticmethod
-    def overlap(embeds, ellipsoids):
-        overlaps = []
+    def overlap(embeds: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[pd.DataFrame, int]:
+        """Measure overlap between every pair of fitted ellipsoids
+        
+        Overlap is defined as either ellipsoid containing one or more points 
+        assigned to the other ellipsoid
+        """
+        overlaps: list[EllipsoidOverlapResult] = []
 
         for i, j in combinations(range(len(ellipsoids)), 2):
             e1 = ellipsoids[i]
@@ -39,7 +48,12 @@ class EllipsoidEvaluator:
         return overlap_df, num_overlaps
 
     @staticmethod
-    def inside_any_count(X, ellipsoids):
+    def inside_any_count(X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, np.ndarray]:
+        """Determine which samples lie inside at least one ellipsoid.
+
+        Returns both a boolean mask indicating whether each sample is covered
+        and the number of ellipsoids covering each sample.
+        """
         inside_any = np.zeros(len(X), dtype=bool)
         inside_count = np.zeros(len(X), dtype=int)
 
@@ -56,7 +70,14 @@ class EllipsoidEvaluator:
         return inside_any, inside_count
     
     @staticmethod
-    def score_samples(X, ellipsoids):
+    def score_samples(X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, int]:
+        """Score samples using their nearest ellipsoid boundary.
+
+        Lower scores indicate samples further inside an ellipsoid, while
+        positive scores lie outside every ellipsoid.
+        """
+
+        # Margin from each ellipsoid boundary
         margins = np.full((len(X), len(ellipsoids)), np.inf)
 
         for i, e in enumerate(ellipsoids):
@@ -70,7 +91,16 @@ class EllipsoidEvaluator:
 
         return scores, best_ellipsoid
     
-    def evaluate_detection(self, good_test_emb, defect_test_emb, ellipsoids):
+    def evaluate_detection(self, 
+                    good_test_emb: np.ndarray, 
+                    defect_test_emb: np.ndarray, 
+                    ellipsoids: Sequence[Ellipsoid]
+                )-> tuple[pd.DataFrame, dict[str, float]]:
+        """Evaluate anomaly detection performance on the test set.
+
+        Scores are converted into binary predictions using the Youden-optimal
+        ROC threshold and returned alongside per-sample diagnostics.
+        """
         X = np.vstack([good_test_emb, defect_test_emb])
 
         y_true = np.concatenate([
@@ -80,7 +110,7 @@ class EllipsoidEvaluator:
 
         scores, best_ellipsoid = self.score_samples(X, ellipsoids)
 
-        auroc = roc_auc_score(y_true, scores)
+        auroc = float(roc_auc_score(y_true, scores))
 
         fpr, tpr, thresholds = roc_curve(y_true, scores)
         best_threshold = thresholds[(tpr - fpr).argmax()]
@@ -91,6 +121,7 @@ class EllipsoidEvaluator:
         n_points = np.array([len(e.covered_idx) for e in ellipsoids])
         eig_ratios = np.array([e.eig_ratio for e in ellipsoids])
 
+        # Record properties of the ellipsoid producing the best score.
         results_df = pd.DataFrame({
             "y_true": y_true,
             "score": scores,
@@ -100,7 +131,7 @@ class EllipsoidEvaluator:
             "winning_eigval_ratio": eig_ratios[best_ellipsoid],
         })
 
-        metrics = {
+        metrics: dict[str, float] = {
             "auroc": auroc,
             "best_threshold": best_threshold,
         }
@@ -108,7 +139,12 @@ class EllipsoidEvaluator:
         return results_df, metrics
     
     @staticmethod
-    def bucket_diagnostics(results_df):
+    def bucket_diagnostics(results_df: pd.DataFrame)-> dict[str, pd.DataFrame]:
+        """Summarise detection performance across ellipsoid characteristics.
+
+        Samples are grouped by ellipsoid size and eigenvalue ratio to analyse
+        how these properties affect classification accuracy and AUROC.
+        """
         results_df = results_df.copy()
 
         results_df["n_points_bucket"] = pd.cut(
@@ -144,8 +180,8 @@ class EllipsoidEvaluator:
             .agg(["mean", "count"])
         )
 
-        bucket_aurocs = []
-
+        # Compute AUROC within each eigenvalue-ratio bucket independently.
+        bucket_aurocs: list[BucketAUROC] = []
         for bucket, group in results_df.groupby(
             "eigval_ratio_bucket",
             observed=False,
@@ -153,10 +189,10 @@ class EllipsoidEvaluator:
             if len(group) == 0 or group["y_true"].nunique() < 2:
                 auroc = None
             else:
-                auroc = roc_auc_score(
+                auroc = float(roc_auc_score(
                     group["y_true"],
                     group["score"],
-                )
+                ))
 
             bucket_aurocs.append({
                 "eigval_ratio_bucket": str(bucket),
@@ -172,5 +208,3 @@ class EllipsoidEvaluator:
             "n_points_by_class": n_points_by_class,
             "eig_ratio_aurocs": eig_ratio_aurocs,
         }
-
-

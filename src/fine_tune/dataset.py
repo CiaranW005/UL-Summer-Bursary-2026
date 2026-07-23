@@ -1,11 +1,20 @@
+import torch
 from torch.utils.data import Dataset
 from PIL import Image
 from pathlib import Path
 
-from .utils import get_category, get_type
+from collections.abc import Callable
 
-class ModelData(Dataset):
-    def __init__(self, paths, root, category_to_id, transform, types_to_id=None):
+from .utils import get_category, get_type
+from .types import Sample
+
+class ModelData(Dataset[Sample]):
+    def __init__(self, 
+            paths: list[str], 
+            root: str, 
+            category_to_id: dict[str, int], 
+            transform: Callable[[Image.Image], torch.Tensor], 
+            types_to_id: dict[str, int] | None = None):
         self.paths = paths
         self.root = Path(root) 
 
@@ -32,7 +41,7 @@ class ModelData(Dataset):
     def __len__(self):
         return len(self.paths)
     
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Sample:
         path = self.root / self.paths[index]
         img = Image.open(path).convert("RGB")
 
@@ -42,4 +51,4 @@ class ModelData(Dataset):
         if self.types_ids is not None:
             return view1, view2, self.category_ids[index], self.types_ids[index]
         
-        return view1, view2, self.category_ids[index]
+        return view1, view2, self.category_ids[index], None

@@ -1,9 +1,11 @@
 import faiss
 import torch
 
+import numpy as np
+
 from ..config.paths import FAISS_IDX, EMBEDS_DIR
 
-def build_index(embs):
+def build_index(embs : np.ndarray) -> None:
     index = faiss.IndexFlatL2(embs.shape[1])
     index.add(embs)
 

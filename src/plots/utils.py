@@ -1,6 +1,11 @@
 import numpy as np
 
-def sphere_surface(center, radius, resolution=20):
+def sphere_surface(
+        center: tuple[float, float, float], 
+        radius: float, 
+        resolution: int =20
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate the surface cordinates of a sphere"""
     u = np.linspace(0, 2 * np.pi, resolution)
     v = np.linspace(0, np.pi, resolution)
 

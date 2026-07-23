@@ -1,7 +1,8 @@
+import torch
 from torch import nn
 
 class ProjectionHead(nn.Module):
-    def __init__(self, dim=384, hidden_dim=768, norm_type : str = None):
+    def __init__(self, dim: int =384, hidden_dim: int =768, norm_type : str | None = None):
         super().__init__()
 
         if norm_type == "batch":
@@ -20,5 +21,5 @@ class ProjectionHead(nn.Module):
             nn.Linear(hidden_dim, dim)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self.net(x)

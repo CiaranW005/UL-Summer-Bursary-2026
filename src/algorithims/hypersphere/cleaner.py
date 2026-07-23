@@ -1,10 +1,15 @@
 import numpy as np
 
-from ...types.hypersphere import Hypersphere
+from ..types import Hypersphere
 
 class CandidateCleaner:
     @staticmethod
-    def clean_candidate(covered_idx, cat_emb, uncovered_mask, min_points=1):
+    def clean_candidate(
+            covered_idx: np.ndarray, 
+            cat_emb: np.ndarray, 
+            uncovered_mask: np.ndarray, 
+            min_points: int =1
+        )-> Hypersphere:
         """
         Iteratively emoved embeddings form a candidate hypersphere until it statisifes the
         exclusive embedding embedding assignment constraint

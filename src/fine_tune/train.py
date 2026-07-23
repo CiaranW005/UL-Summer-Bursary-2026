@@ -1,30 +1,42 @@
 import torch
+import torch.nn as nn
 
-from dataclasses import dataclass
+from torch.utils.data import DataLoader
+from torch.optim import Optimizer
+from collections.abc import Sequence
 
-@dataclass
-class EmbeddingBatch:
-    proj_view1: torch.Tensor
-    proj_view2: torch.Tensor
+from .types import Sample, EmbeddingBatch
 
-    categories: torch.Tensor
-
-    org_view1: torch.Tensor | None = None
-    org_view2: torch.Tensor | None = None
-
-    negatives : torch.Tensor | None = None
-
-def run_models(x, models):
+def run_models(
+        x: torch.Tensor, 
+        models: Sequence[nn.Module]
+    ) -> torch.Tensor:
+    """Pass a tensor sequentially through a list of models."""
     for model in models:
         x = model(x)
     return x
 
-def train_one_epoch(model, inf_models, dataloader, criterion, optimizer, device):
+def train_one_epoch(
+        model: nn.Module, 
+        inf_models: list[nn.Module], 
+        dataloader: DataLoader[Sample], 
+        criterion: nn.Module, 
+        optimizer: Optimizer, 
+        device: torch.device
+    ) -> float:
+    """Train the projection model for one epoch.
+
+    Frozen inference models generate base embeddings for two augmented views.
+    The trainable model projects those embeddings before the contrastive loss
+    is calculated.
+
+    Returns:
+        The mean loss across all batches.
+    """
     model.train()
 
     total_loss = 0.0
-
-    for view1, view2, category in dataloader:
+    for batch_idx, (view1, view2, category) in enumerate(dataloader): # TODO: Log the batch idx info comes from
         view1, view2 = view1.to(device), view2.to(device)
         category = category.to(device)
 
@@ -50,31 +62,49 @@ def train_one_epoch(model, inf_models, dataloader, criterion, optimizer, device)
         )
 
         # Contrastive based loss
-        loss, components = criterion(batch)
+        loss, _ = criterion(batch)
         
         loss.backward()
 
-        grad_norm = 0.0
-
+        grad_norm_sq: float = 0.0
         for parameter in model.parameters():
-            if parameter is not None:
-                grad_norm += parameter.grad.norm().item()  ** 2
+            grad = parameter.grad
 
-        grad_norm = grad_norm ** 0.5
-        print("Gradient Norm:", grad_norm)
+            if grad is None:
+                continue
+
+            grad_norm_sq += float(torch.sum(grad * grad).item())
+
+        # TODO: Log grad_norm
+        grad_norm = grad_norm_sq**0.5
 
         before = next(model.parameters()).detach().clone()
 
         optimizer.step()
 
         after = next(model.parameters()).detach().clone()
+        parameter_change = (after - before).abs().mean().item() # TODO: Log parameter_change
 
-        print("Paramter change:", (after - before).abs().mean().item())
+        #make a doct that returns data from steps here
         total_loss += loss.item()
+
+    if len(dataloader) == 0:
+        raise RuntimeError("Training dataloader produced no batches")
 
     return total_loss / len(dataloader)
 
-def evaluate(model, inf_models, dataloader, criterion, device):
+def evaluate(
+        model: nn.Module, 
+        inf_models: Sequence[nn.Module], 
+        dataloader: DataLoader[Sample], 
+        criterion: nn.Module, 
+        device: torch.device
+    ) -> float:
+    """Evaluate the projection model.
+
+    Returns:
+        The mean loss across all validation batches.
+    """
     model.eval()
 
     total_loss = 0.0
@@ -99,9 +129,12 @@ def evaluate(model, inf_models, dataloader, criterion, device):
                 categories=category
             )
 
-            loss, components = criterion(batch)
+            loss, _ = criterion(batch)
 
             total_loss += loss.item()
 
+    if len(dataloader) == 0:
+            raise RuntimeError("Evaluation dataloader produced no batches.")
+    
     return total_loss / len(dataloader)
 

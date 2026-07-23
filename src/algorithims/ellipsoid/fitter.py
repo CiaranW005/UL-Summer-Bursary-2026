@@ -1,13 +1,22 @@
 import numpy as np
 
-from ...types import Ellipsoid
+from collections.abc import Sequence
+import logging
 
+from ..types import Ellipsoid
+
+logger =  logging.getLogger(__name__)
 class EllipsoidFitter:
-    def __init__(self, support_points=5, reg=1e-4):
+    def __init__(self, 
+            support_points: int =5, 
+            reg: float =1e-4):
         self.support_points=support_points
         self.reg = reg
 
-    def fit(self, X, weights):
+    def fit(self, X: np.ndarray, weights: np.ndarray) -> Ellipsoid:
+        """Fit a weighted ellipsoid to a collection of points."""
+
+        # Normalize weights for statistical estimation of center and covariance.
         w = weights / weights.sum()
 
         center = np.average(X, axis=0, weights=w)
@@ -33,7 +42,10 @@ class EllipsoidFitter:
 
         proj = diff @ eigvecs
 
+
         d2 = np.sum((proj ** 2) / eigvals, axis=1)
+        # Use raw cleaning weights for the boundary so shrinking a point's weight
+        # directly reduces its influence on the ellipsoid threshold.
         threshold = (d2 * weights).max()
 
         eig_ratio = eigvals.max() / eigvals.min() 
@@ -47,10 +59,15 @@ class EllipsoidFitter:
             weights=weights
         )
     
-    def fit_supported(self, X, weights, previous_ellipsoids):
+    def fit_supported(self, X: np.ndarray, weights: np.ndarray, previous_ellipsoids: Sequence[Ellipsoid]):
+        """Fit an ellipsoid using the nearest previous ellipsoid as support."""
+        if not previous_ellipsoids:
+            logger.warning("Previous ellipsoids is empty")
+            return self.fit(X, weights)
+        
         w = weights / weights.sum()
         
-        center = X.mean(axis=0)
+        center = np.average(X, axis=0, weights=w)
         diff = X - center
 
         if len(X) > 1:
@@ -61,10 +78,14 @@ class EllipsoidFitter:
         else:
             own_cov = np.eye(X.shape[1])
 
-        support_id = np.argmin([
-            np.linalg.norm(center - e.center) 
-            for e in previous_ellipsoids
-        ])
+        distances = [
+            np.linalg.norm(center - ellipsoid.center)
+            for ellipsoid in previous_ellipsoids
+        ]
+
+        support_id = int(np.argmin(distances))
+        support = previous_ellipsoids[support_id]
+
         support = previous_ellipsoids[support_id]
 
         sup_cov = support.eigvecs @ np.diag(support.eigvals) @ support.eigvecs.T
@@ -96,19 +117,26 @@ class EllipsoidFitter:
             eigvals=eigvals,
             threshold=threshold,
             eig_ratio=eig_ratio,
-            support_id=int(support_id),
+            support_id=support_id,
             weights=weights
         )
 
     @staticmethod
-    def inside(X, ellipsoid):
+    def inside(X: np.ndarray, ellipsoid: Ellipsoid) -> np.ndarray:
+        """Return a mask indicating which points lie inside an ellipsoid."""
         diff = X - ellipsoid.center
         proj = diff @ ellipsoid.eigvecs
         d2 = np.sum((proj ** 2) / ellipsoid.eigvals, axis=1)
         return d2 <= ellipsoid.threshold 
     
     @staticmethod
-    def grow(X, ellipsoid, growth, min_growth=5e-3):
+    def grow(
+        X: np.ndarray, 
+        ellipsoid: Ellipsoid, 
+        growth: float, 
+        min_growth: float = 5e-3
+    )-> np.ndarray:
+        """Return points covered after variance-scaled ellipsoid growth."""
         diff = X - ellipsoid.center
         proj = diff @ ellipsoid.eigvecs
 
