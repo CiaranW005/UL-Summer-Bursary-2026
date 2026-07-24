@@ -54,3 +54,4 @@ class BucketAUROC(TypedDict):
     eigval_ratio_bucket: str
     auroc: float  | None
     count: int
+    

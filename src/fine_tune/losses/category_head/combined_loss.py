@@ -50,9 +50,3 @@ class CombinedLoss(nn.Module):
         components["total"] = total_loss.detach().item()
 
         return total_loss, components
-
-
-
-
-
-

@@ -52,3 +52,4 @@ class ModelData(Dataset[Sample]):
             return view1, view2, self.category_ids[index], self.types_ids[index]
         
         return view1, view2, self.category_ids[index], None
+    

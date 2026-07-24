@@ -93,3 +93,4 @@ class HypersphereEvaluator:
 
         auroc = float(roc_auc_score(y_true, scores))
         return auroc
+    

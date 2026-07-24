@@ -76,3 +76,4 @@ if __name__ == "__main__":
     for images in loader:
         print(images.shape)
         break
+    

@@ -78,3 +78,4 @@ class CandidateCleaner:
             radius=radius,
             covered_idx=covered_idx
         )
+    

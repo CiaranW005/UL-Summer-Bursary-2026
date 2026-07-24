@@ -425,3 +425,4 @@ def plot_3d_sphere_cover(
 
     fig.show()
     fig.write_image(output_dir / "3d_hypersphere_plot.svg")
+    

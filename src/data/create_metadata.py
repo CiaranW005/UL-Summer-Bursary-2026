@@ -1,16 +1,8 @@
 import os
 import pandas as pd
 
-from typing import TypedDict
-
 from ..config.paths import ROOT, DATA_DIR, DATASET_DIR, CSV_PATH
-
-class ImageRecord(TypedDict):
-    path : str
-    category: str
-    split: str
-    type: str
-    label: int
+from .types import ImageRecord
 
 def create_metadata() -> None:
     """

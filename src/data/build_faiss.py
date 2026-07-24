@@ -15,3 +15,4 @@ if __name__ == "__main__":
     embs = torch.load(EMBEDS_DIR / "raw_embeds.pt")
 
     build_index(embs=embs)
+    

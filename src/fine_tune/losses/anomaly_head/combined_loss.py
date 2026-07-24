@@ -44,9 +44,3 @@ class CombinedLoss(nn.Module):
             
 
         return total_loss, components
-
-
-
-
-
-

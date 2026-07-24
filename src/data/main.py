@@ -6,7 +6,6 @@ import torch.nn as nn
 
 from typing import Literal
 from pathlib import Path
-import numpy as np
 
 from typing import cast 
 
@@ -16,16 +15,16 @@ from ..fine_tune.model import ProjectionHead
 from .create_metadata import create_metadata
 from .init_db import build_metadata_db
 from .preprocess import preprocess
-from .extract_embs import get_embeddings
-from .build_faiss import build_index
+from .save_embeds import save_dino_layers, save_standard_embeddings
+
+from .types import DinoModel
 
 EmbeddingMode = Literal[
     "dino",
+    "dino_layers",
     "category_head",
     "anomaly_head"
 ]
-
-EMBEDDING_MODE: EmbeddingMode = "anomaly_head"
 
 def get_latest_checkpoint(dir: Path) -> Path:
     if not dir.exists():
@@ -84,6 +83,9 @@ def load_embedding_model(
     if mode == "dino":
         return []
 
+    if mode == "dino_layers":
+        return []
+    
     if mode == "category_head":
         return [load_projection_head(
             checkpoint_dir=MODELS / "category_head",
@@ -113,15 +115,42 @@ def output_directory(
 ) -> Path:
     return EMBEDS_DIR / f"{mode}_embeds"
 
+MODE_OPTIONS: dict[str, EmbeddingMode] = {
+    "1": "dino",
+    "2": "dino_layers",
+    "3": "category_head",
+    "4": "anomaly_head",
+}
+
+def select_embedding_mode() -> EmbeddingMode:
+    print("\nSelect embedding mode:")
+    print("1. DINO final layer")
+    print("2. DINO intermediate layers")
+    print("3. Category projection head")
+    print("4. Anomaly projection head")
+
+    while True:
+        selection = input("Mode [1-4]: ").strip()
+
+        mode = MODE_OPTIONS.get(selection)
+
+        if mode is not None:
+            print(f"Selected mode: {mode}")
+            return mode
+
+        print("Invalid selection. Enter 1, 2, 3, or 4.")
+
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    EMBEDDING_MODE = select_embedding_mode()
     output_dir = output_directory(EMBEDDING_MODE)
 
     os.makedirs(MODELS, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
 
-    dino = cast(nn.Module, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
+    dino = cast(DinoModel, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
             repo_or_dir="facebookresearch/dinov2",
             model="dinov2_vits14"
         ))
@@ -129,7 +158,7 @@ if __name__ == "__main__":
     dino.to(device)
     dino.eval()
 
-    embedding_models = load_embedding_model(
+    projection_models = load_embedding_model(
         mode=EMBEDDING_MODE,
         device=device
     )
@@ -139,54 +168,7 @@ if __name__ == "__main__":
 
     loader = preprocess()
 
-    print(f"Images: {loader.dataset}")
-
-    base_cls, projected_cls, patches = get_embeddings(dino=dino, models=embedding_models, loader=loader, device=device)
-
-    print(f"cls_tokens Shape: {projected_cls.shape}")
-    print(f"Patches Shape: {patches.shape}")
-
-    torch.save(projected_cls, output_dir / "cls.pt")
-    torch.save(patches, output_dir / "patch.pt")
-
-    build_index(embs=projected_cls)
-
-    correction = projected_cls - base_cls
-
-    relative_change = (
-        np.linalg.norm(correction, axis=1)
-        / np.clip(np.linalg.norm(base_cls, axis=1), 1e-8, None)
-    )
-
-    cosine_similarity = (
-        np.sum(base_cls * projected_cls, axis=1)
-        / (
-            np.linalg.norm(base_cls, axis=1)
-            * np.linalg.norm(projected_cls, axis=1)
-            + 1e-8
-        )
-    )
-
-    print("Mean relative change:", relative_change.mean())
-    print("Median relative change:", np.median(relative_change))
-    print("Mean cosine similarity:", cosine_similarity.mean())
-
-    base_norm = np.linalg.norm(base_cls, axis=1, keepdims=True)
-    projected_norm = np.linalg.norm(projected_cls, axis=1, keepdims=True)
-
-    norm_ratio = projected_norm / np.clip(base_norm, 1e-8, None)
-
-    print("Mean projected/base norm ratio:", norm_ratio.mean())
-    print("Median projected/base norm ratio:", np.median(norm_ratio))
-
-    projected_rescaled = projected_cls * (
-    base_norm / np.clip(projected_norm, 1e-8, None)
-    )
-
-    directional_change = (
-        np.linalg.norm(projected_rescaled - base_cls, axis=1)
-        / np.clip(base_norm.squeeze(1), 1e-8, None)
-    )
-
-    print("Mean directional-only change:", directional_change.mean())
-    print("Median directional-only change:", np.median(directional_change))
+    if EMBEDDING_MODE == "dino_layers":
+        save_dino_layers(dino, loader, device, output_dir)
+    else:
+        save_standard_embeddings(dino, projection_models, loader, device, output_dir)

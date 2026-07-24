@@ -131,3 +131,4 @@ class EllipsoidCover:
             ellipsoids_df.to_csv(output_dir / "ellipsoids.csv", index=False)
         
         return ellipsoids, ellipsoids_df
+    

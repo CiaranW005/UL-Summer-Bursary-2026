@@ -118,3 +118,4 @@ class AnomalyCategoryContLoss(nn.Module):
             }
 
         return -mean_pos_log_prob[valid].mean(), cosines
+    

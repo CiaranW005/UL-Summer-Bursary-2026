@@ -43,5 +43,3 @@ class PreservationLoss(nn.Module):
             self.sim_weight * similarity_loss
             + self.norm_weight * norm_loss
         )
-
-    

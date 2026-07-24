@@ -60,3 +60,4 @@ class CategoryContLoss(nn.Module):
             return embeddings.sum() * 0.0
         
         return -mean_pos_log_prob[valid].mean()
+    
