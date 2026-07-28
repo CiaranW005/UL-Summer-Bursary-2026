@@ -18,11 +18,11 @@ def run_models(
 
 def train_one_epoch(
         model: nn.Module, 
-        inf_models: list[nn.Module], 
         dataloader: DataLoader[Sample], 
         criterion: nn.Module, 
         optimizer: Optimizer, 
-        device: torch.device
+        device: torch.device,
+        inf_models: list[nn.Module] | None = None
     ) -> float:
     """Train the projection model for one epoch.
 
@@ -36,23 +36,30 @@ def train_one_epoch(
     model.train()
 
     total_loss = 0.0
-    for batch_idx, (view1, view2, category) in enumerate(dataloader): # TODO: Log the batch idx info comes from
+    for batch_idx, (view1, view2, category, _) in enumerate(dataloader): # TODO: Log the batch idx info comes from
         view1, view2 = view1.to(device), view2.to(device)
         category = category.to(device)
 
         optimizer.zero_grad()
 
         # Get embeddings from frozen dino
-        with torch.no_grad():
-            emb1 = run_models(view1, inf_models)
-            emb2 = run_models(view2, inf_models)
+        if inf_models is not None:
+            with torch.no_grad():
+                emb1 = run_models(view1, inf_models)
+                emb2 = run_models(view2, inf_models)
+        else:
+            emb1 = view1
+            emb2 = view2
 
 
         # Embeddings from the projection head 
         z1 = model(emb1)
         z2 = model(emb2)
 
-        z_negs = model(criterion.negatives)
+        if hasattr(criterion, "negatives"):
+            z_negs = model(criterion.negatives)
+        else:
+            z_negs = None
 
         batch = EmbeddingBatch(
             proj_view1=z1,
@@ -95,10 +102,10 @@ def train_one_epoch(
 
 def evaluate(
         model: nn.Module, 
-        inf_models: Sequence[nn.Module], 
         dataloader: DataLoader[Sample], 
         criterion: nn.Module, 
-        device: torch.device
+        device: torch.device,
+        inf_models: list[nn.Module] | None = None
     ) -> float:
     """Evaluate the projection model.
 
@@ -109,18 +116,25 @@ def evaluate(
 
     total_loss = 0.0
     with torch.no_grad():
-        for view1, view2, category in dataloader:
+        for view1, view2, category, _ in dataloader:
             view1, view2 = view1.to(device), view2.to(device)
             category = category.to(device)
-            
-            with torch.no_grad():
-                emb1 = run_models(view1, inf_models)
-                emb2 = run_models(view2, inf_models)
+
+            if inf_models is not None:
+                with torch.no_grad():
+                    emb1 = run_models(view1, inf_models)
+                    emb2 = run_models(view2, inf_models)
+            else:
+                emb1 = view1
+                emb2 = view2
 
             z1 = model(emb1)
             z2 = model(emb2)
 
-            z_negs = model(criterion.negatives)
+            if hasattr(criterion, "negatives"):
+                z_negs = model(criterion.negatives)
+            else:
+                z_negs = None
 
             batch = EmbeddingBatch(
                 proj_view1=z1,

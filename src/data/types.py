@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from typing import TypedDict, Protocol, Self
 from dataclasses import dataclass, field
-from collections.abc import Sequence
+from collections.abc import Sequence, Mapping
 
 class ImageRecord(TypedDict):
     path : str
@@ -35,6 +35,14 @@ class DinoModel(Protocol):
         self,
         x: torch.Tensor,
     ) -> DinoFeatures:
+        ...
+
+    def load_state_dict(
+        self,
+        state_dict: Mapping[str, torch.Tensor],
+        strict: bool = True,
+        assign: bool = False
+    ) -> object:
         ...
     
     def get_intermediate_layers(

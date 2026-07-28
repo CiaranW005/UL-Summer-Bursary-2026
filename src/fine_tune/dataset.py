@@ -51,5 +51,5 @@ class ModelData(Dataset[Sample]):
         if self.types_ids is not None:
             return view1, view2, self.category_ids[index], self.types_ids[index]
         
-        return view1, view2, self.category_ids[index], None
+        return view1, view2, self.category_ids[index], -1
     

@@ -60,7 +60,7 @@ class HypersphereCover:
                 nbrs_local = nbrs[local_compact]
 
                 # Finds the original indices of the points
-                full_covered_idx = uncovered_idx[np.concatenate(local_compact, nbrs_local)]
+                full_covered_idx = uncovered_idx[np.r_[local_compact, nbrs_local]]
 
                 hypersphere = self.cleaner.clean_candidate(
                     full_covered_idx,

@@ -69,7 +69,7 @@ class EllipsoidCover:
                 nbrs_local = nbrs[local_compact]
 
                 # Map the selected uncovered points back to their original embedding indices.
-                full_covered_idx = uncovered_idx[np.concatenate(local_compact, nbrs_local)]
+                full_covered_idx = uncovered_idx[np.r_[local_compact, nbrs_local]]
 
                 weights = np.ones(len(full_covered_idx))
                 self.cleaner.min_points = 1

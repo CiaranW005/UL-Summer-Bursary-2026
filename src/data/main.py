@@ -2,7 +2,6 @@
 
 import os
 import torch
-import torch.nn as nn
 
 from typing import Literal
 from pathlib import Path
@@ -22,6 +21,7 @@ from .types import DinoModel
 EmbeddingMode = Literal[
     "dino",
     "dino_layers",
+    "dino_fine_tune",
     "category_head",
     "anomaly_head"
 ]
@@ -50,7 +50,8 @@ def get_latest_checkpoint(dir: Path) -> Path:
 def load_projection_head(
         checkpoint_dir: Path,
         device : torch.device,
-    ) -> nn.Module:
+    ) -> ProjectionHead:
+
     model_path = get_latest_checkpoint(checkpoint_dir)
 
     print("Loading Checkpoint:", model_path)
@@ -76,14 +77,39 @@ def load_projection_head(
 
     return model
 
+def load_fine_tuned_dino(
+    checkpoint_dir: Path,
+    device: torch.device,
+) -> DinoModel:
+    model_path = get_latest_checkpoint(checkpoint_dir)
+
+    print("Loading DINO checkpoint:", model_path)
+
+    checkpoint = torch.load(
+        model_path,
+        map_location=device,
+        weights_only=True,
+    )
+
+    dino = cast(
+        DinoModel,
+        torch.hub.load( # pyright: ignore[reportUnknownMemberType]
+            repo_or_dir="facebookresearch/dinov2",
+            model="dinov2_vits14",
+        ),
+    )
+
+    dino.load_state_dict(checkpoint["model_state_dict"])
+    dino.to(device)
+    dino.eval()
+
+    return dino
+
 def load_embedding_model(
         mode : EmbeddingMode,
         device: torch.device
-) -> list[nn.Module]:
-    if mode == "dino":
-        return []
-
-    if mode == "dino_layers":
+) -> list[ProjectionHead]:
+    if mode in {"dino", "dino_layers", "dino_fine_tune"}:
         return []
     
     if mode == "category_head":
@@ -118,19 +144,21 @@ def output_directory(
 MODE_OPTIONS: dict[str, EmbeddingMode] = {
     "1": "dino",
     "2": "dino_layers",
-    "3": "category_head",
-    "4": "anomaly_head",
+    "3": "dino_fine_tune",
+    "4": "category_head",
+    "5": "anomaly_head",
 }
 
 def select_embedding_mode() -> EmbeddingMode:
     print("\nSelect embedding mode:")
     print("1. DINO final layer")
     print("2. DINO intermediate layers")
-    print("3. Category projection head")
-    print("4. Anomaly projection head")
+    print("3. DINO final layer fine-tuned")
+    print("4. Category projection head")
+    print("5. Anomaly projection head")
 
     while True:
-        selection = input("Mode [1-4]: ").strip()
+        selection = input("Mode [1-5]: ").strip()
 
         mode = MODE_OPTIONS.get(selection)
 
@@ -138,7 +166,7 @@ def select_embedding_mode() -> EmbeddingMode:
             print(f"Selected mode: {mode}")
             return mode
 
-        print("Invalid selection. Enter 1, 2, 3, or 4.")
+        print("Invalid selection. Enter 1, 2, 3, 4 or 5.")
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -150,10 +178,16 @@ if __name__ == "__main__":
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
 
-    dino = cast(DinoModel, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
-            repo_or_dir="facebookresearch/dinov2",
-            model="dinov2_vits14"
-        ))
+    if EMBEDDING_MODE == "dino_fine_tune":
+        dino = load_fine_tuned_dino(
+            checkpoint_dir=MODELS / "dino_fine_tune", 
+            device=device
+            )
+    else:
+        dino = cast(DinoModel, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
+                repo_or_dir="facebookresearch/dinov2",
+                model="dinov2_vits14"
+            ))
     
     dino.to(device)
     dino.eval()
