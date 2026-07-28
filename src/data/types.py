@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 
-from typing import TypedDict, Protocol, Self
+from typing import TypedDict
 from dataclasses import dataclass, field
-from collections.abc import Sequence, Mapping
-
+from collections.abc import Sequence
 class ImageRecord(TypedDict):
     path : str
     category: str
@@ -22,29 +21,15 @@ class DinoFeatures(TypedDict):
     x_norm_clstoken : torch.Tensor
     x_norm_patchtokens: torch.Tensor
 
-class DinoModel(Protocol):
+class DinoModel(nn.Module):
     blocks: Sequence[nn.Module]
-
-    def to(self, device: torch.device) -> Self:
-        ...
-
-    def eval(self) -> Self:
-        ...
 
     def forward_features(
         self,
         x: torch.Tensor,
     ) -> DinoFeatures:
-        ...
+        raise NotImplementedError
 
-    def load_state_dict(
-        self,
-        state_dict: Mapping[str, torch.Tensor],
-        strict: bool = True,
-        assign: bool = False
-    ) -> object:
-        ...
-    
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
@@ -53,4 +38,4 @@ class DinoModel(Protocol):
         return_class_token: bool = False,
         norm: bool = True,
     ) -> tuple[tuple[torch.Tensor, torch.Tensor], ...]:
-        ...
+        raise NotImplementedError

@@ -10,8 +10,8 @@ class CombinedLoss(nn.Module):
             self, 
             enabled: dict[str, bool],
             weights: dict[str, float],
-            negatives: list[torch.Tensor],
-            negative_labels: list[int]
+            negatives: torch.Tensor,
+            negative_labels: torch.Tensor
         ):
         super().__init__()
 

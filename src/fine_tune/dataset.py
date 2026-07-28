@@ -11,7 +11,7 @@ from .types import Sample
 class ModelData(Dataset[Sample]):
     def __init__(self, 
             paths: list[str], 
-            root: str, 
+            root: Path, 
             category_to_id: dict[str, int], 
             transform: Callable[[Image.Image], torch.Tensor], 
             types_to_id: dict[str, int] | None = None):
