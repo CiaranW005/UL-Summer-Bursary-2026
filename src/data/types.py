@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from typing import TypedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections.abc import Sequence
 class ImageRecord(TypedDict):
     path : str
@@ -13,10 +13,9 @@ class ImageRecord(TypedDict):
 
 @dataclass
 class Embeddings:
-    base_cls: list[torch.Tensor] = field(default_factory=lambda: [])
-    projected_cls: list[torch.Tensor] = field(default_factory=lambda: [])
-    patches: list[torch.Tensor] = field(default_factory=lambda: [])
-
+    cls: dict[str, list[torch.Tensor]]
+    patches: list[torch.Tensor]
+    
 class DinoFeatures(TypedDict):
     x_norm_clstoken : torch.Tensor
     x_norm_patchtokens: torch.Tensor

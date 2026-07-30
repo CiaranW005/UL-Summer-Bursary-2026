@@ -4,6 +4,8 @@ import torch.nn as nn
 from .category_loss import CategoryContLoss
 from .preserve import PreservationLoss
 
+from ...types import EmbeddingBatch
+
 class CombinedLoss(nn.Module):
     def __init__(
             self, 
@@ -24,9 +26,9 @@ class CombinedLoss(nn.Module):
         if len(self.losses) == 0:
             raise ValueError("At least one loss must be enabled.")
 
-    def forward(self, batch):
+    def forward(self, batch: EmbeddingBatch) -> tuple[torch.Tensor, dict[str, float]]:
         total_loss = batch.proj_view1.new_tensor(0.0)
-        components = {}
+        components: dict[str, float]= {}
 
         if "category_cont" in self.losses:
             projected = torch.cat([batch.proj_view1, batch.proj_view2], dim=0)
@@ -40,7 +42,7 @@ class CombinedLoss(nn.Module):
             
         if "preservation" in self.losses:
             preserve_z1 = self.losses["preservation"](batch.org_view1, batch.proj_view1)
-            preserve_z2 = self.losses["preservation"](batch.org_view1, batch.proj_view2)
+            preserve_z2 = self.losses["preservation"](batch.org_view2, batch.proj_view2)
 
             preserve_loss = 0.5 * (preserve_z1 + preserve_z2)
 

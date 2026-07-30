@@ -6,17 +6,15 @@ import torch
 from typing import Literal
 from pathlib import Path
 
-from typing import cast 
+import json
 
 from ..config.paths import MODELS, EMBEDS_DIR, FAISS_DIR
-from ..fine_tune.model import ProjectionHead
+from ..model_selection import get_checkpoints, load_inference_models, EmbeddingPipeline
 
 from .create_metadata import create_metadata
 from .init_db import build_metadata_db
 from .preprocess import preprocess
 from .save_embeds import save_dino_layers, save_standard_embeddings
-
-from .types import DinoModel
 
 EmbeddingMode = Literal[
     "dino",
@@ -26,120 +24,79 @@ EmbeddingMode = Literal[
     "anomaly_head"
 ]
 
-def get_latest_checkpoint(dir: Path) -> Path:
-    if not dir.exists():
-        raise FileNotFoundError(
-            f"Checkpoint directory does not exist: {dir}"
-        )
-    
-    checkpoints = [
-        path for path in dir.iterdir()
-        if path.is_file()
-    ]
-
+def select_checkpoint(
+        checkpoints: list[Path],
+        *,
+        model_name: str,
+) -> Path | None:
     if not checkpoints:
         raise FileNotFoundError(
-            f"No checkpoints found in {dir}"
+            f"No {model_name} checkpoints were found"
         )
 
-    return max(
-        checkpoints,
-        key=lambda path: path.stat().st_mtime
-    )
+    print(f"\nSelect {model_name}:")
 
-def load_projection_head(
-        checkpoint_dir: Path,
-        device : torch.device,
-    ) -> ProjectionHead:
+    option_num = 1
 
-    model_path = get_latest_checkpoint(checkpoint_dir)
+    for i, checkpoint in enumerate(checkpoints, start=option_num):
+        with open(checkpoint / "metadata.json", "r") as f:
+            MODEL_INFO = json.load(f)
 
-    print("Loading Checkpoint:", model_path)
+        notes = MODEL_INFO["notes"]
+        
+        print(f"{i}: {checkpoint.name}")
+        for j, note in enumerate(notes):
+            label = "Notes:" if j == 0 else ""
+            print(f"\t{label:<12}{note}")
 
-    checkpoint = torch.load(
-        model_path,
-        map_location=device,
-        weights_only=True
-    )
+    max_option = len(checkpoints)
 
-    parameters = checkpoint["model_info"]["parameters"]
+    while True:
+        raw_selection = input(f"Selection [1-{max_option}]: ")
 
-    model = ProjectionHead(
-        dim=parameters["model_dim"],
-        hidden_dim=parameters["hidden_dim"],
-        norm_type=parameters["model_normaliser"]
-    )
+        try:
+            selection = int(raw_selection)
+        except ValueError:
+            print("Enter a valid number")
+            continue
 
-    model.load_state_dict(checkpoint["model_state_dict"])
+        if not 1 <= selection <= max_option:
+            print(f"Enter a number from 1 to {max_option}")
+            continue
 
-    model.to(device)
-    model.eval()
 
-    return model
+        checkpoint_idx = selection - 1
+        return checkpoints[checkpoint_idx]
 
-def load_fine_tuned_dino(
-    checkpoint_dir: Path,
-    device: torch.device,
-) -> DinoModel:
-    model_path = get_latest_checkpoint(checkpoint_dir)
-
-    print("Loading DINO checkpoint:", model_path)
-
-    checkpoint = torch.load(
-        model_path,
-        map_location=device,
-        weights_only=True,
-    )
-
-    dino = cast(
-        DinoModel,
-        torch.hub.load( # pyright: ignore[reportUnknownMemberType]
-            repo_or_dir="facebookresearch/dinov2",
-            model="dinov2_vits14",
-        ),
-    )
-
-    dino.load_state_dict(checkpoint["model_state_dict"])
-    dino.to(device)
-    dino.eval()
-
-    return dino
-
-def load_embedding_model(
-        mode : EmbeddingMode,
+def select_pipeline(
+        mode: EmbeddingMode,
         device: torch.device
-) -> list[ProjectionHead]:
-    if mode in {"dino", "dino_layers", "dino_fine_tune"}:
-        return []
+) -> EmbeddingPipeline:
+    if mode in {"dino", "dino_layers"}:
+      selected_path = None
+
+    elif mode == "dino_fine_tune":
+        selected_path = select_checkpoint(
+            get_checkpoints(MODELS / "dino_fine_tune"),
+            model_name="fine-tuned DINO",
+        )
+
+    elif mode == "category_head":
+        selected_path = select_checkpoint(
+             get_checkpoints(MODELS / "category_head"),
+            model_name="Category Projection Head",
+        )
+
+    elif mode == "anomaly_head":
+        selected_path = select_checkpoint(
+            get_checkpoints(MODELS / "anomaly_head"),
+            model_name="Anomaly Projection Head"
+        )
+    else:
+        raise ValueError(f"Unsupported Embedding Mode: {mode}")
     
-    if mode == "category_head":
-        return [load_projection_head(
-            checkpoint_dir=MODELS / "category_head",
-            device=device
-        )]
+    return load_inference_models(model_dir=selected_path, device=device)
 
-    if mode == "anomaly_head":
-        category_head = load_projection_head(
-            checkpoint_dir=MODELS / "category_head",
-            device=device
-        )
-
-        anomaly_head  = load_projection_head(
-            checkpoint_dir=MODELS / "anomaly_head",
-            device=device
-        )
-
-        return [category_head, anomaly_head]
-
-    raise ValueError(
-        f"Unknown embedding mode: {mode}"
-    )
-
-
-def output_directory(
-    mode: EmbeddingMode,
-) -> Path:
-    return EMBEDS_DIR / f"{mode}_embeds"
 
 MODE_OPTIONS: dict[str, EmbeddingMode] = {
     "1": "dino",
@@ -158,7 +115,7 @@ def select_embedding_mode() -> EmbeddingMode:
     print("5. Anomaly projection head")
 
     while True:
-        selection = input("Mode [1-5]: ").strip()
+        selection = input("Mode [1-5]: ")
 
         mode = MODE_OPTIONS.get(selection)
 
@@ -172,30 +129,11 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     EMBEDDING_MODE = select_embedding_mode()
-    output_dir = output_directory(EMBEDDING_MODE)
+    PIPELINE = select_pipeline(EMBEDDING_MODE, device=device)
 
     os.makedirs(MODELS, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(EMBEDS_DIR, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
-
-    if EMBEDDING_MODE == "dino_fine_tune":
-        dino = load_fine_tuned_dino(
-            checkpoint_dir=MODELS / "dino_fine_tune", 
-            device=device
-            )
-    else:
-        dino = cast(DinoModel, torch.hub.load( # pyright: ignore[reportUnknownMemberType]
-                repo_or_dir="facebookresearch/dinov2",
-                model="dinov2_vits14"
-            ))
-    
-    dino.to(device)
-    dino.eval()
-
-    projection_models = load_embedding_model(
-        mode=EMBEDDING_MODE,
-        device=device
-    )
 
     create_metadata()
     build_metadata_db()
@@ -203,6 +141,6 @@ if __name__ == "__main__":
     loader = preprocess()
 
     if EMBEDDING_MODE == "dino_layers":
-        save_dino_layers(dino, loader, device, output_dir)
+        save_dino_layers(PIPELINE.dino_stage, loader, device, EMBEDS_DIR)
     else:
-        save_standard_embeddings(dino, projection_models, loader, device, output_dir)
+        save_standard_embeddings(PIPELINE, loader, device, EMBEDS_DIR)

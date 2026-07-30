@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from tqdm import tqdm
@@ -9,41 +8,46 @@ from collections.abc import Sequence
 import numpy as np
 
 from .types import Embeddings, DinoModel
+from ..model_selection.types import EmbeddingPipeline
 
 @torch.inference_mode()
 def get_embeddings(
-        dino: DinoModel, 
+        pipeline: EmbeddingPipeline,
         loader: DataLoader[torch.Tensor], 
-        device: torch.device, 
-        models: Sequence[nn.Module]
-        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        device: torch.device
+        ) -> tuple[dict[str, np.ndarray], np.ndarray]:
 
-    for model in models:
-        model.eval()
+    for stage in pipeline:
+        stage.model.eval()
 
-    embeds = Embeddings()
+    embeds = Embeddings(
+        cls={stage.name: [] for stage in pipeline},
+        patches=[]
+    )
    
     for images in tqdm(loader):
         images = images.to(device)
-        
-        features = dino.forward_features(images)
-        batch_base = features["x_norm_clstoken"]
-        batch_patches = features["x_norm_patchtokens"]
 
-        batch_projected = batch_base
-        for model in models:
-            batch_projected = model(batch_projected)
+        features = pipeline.dino.forward_features(images)
 
-        embeds.base_cls.append(batch_base.cpu())
-        embeds.projected_cls.append(batch_projected.cpu())
-        embeds.patches.append(batch_patches.cpu())
-    
-    base_cls = torch.cat(embeds.base_cls).numpy().astype("float32")
-    projected_cls = torch.cat(embeds.projected_cls).numpy().astype("float32")
+        current_cls = features["x_norm_clstoken"]
+        patches = features["x_norm_patchtokens"]
+
+        embeds.cls["dino"].append(current_cls.cpu())
+
+        for stage in pipeline.heads:
+            current_cls = stage.model(current_cls)
+            embeds.cls[stage.name].append(current_cls.cpu())
+
+        embeds.patches.append(patches.cpu())
+
+    cls_embeds = {
+        name : torch.cat(batches).numpy().astype("float32")
+        for name, batches in embeds.cls.items()
+    }
 
     patches = torch.cat(embeds.patches).numpy().astype("float32")
-    
-    return base_cls, projected_cls, patches
+    return cls_embeds, patches
 
 @torch.inference_mode()
 def get_layer_embeddings(

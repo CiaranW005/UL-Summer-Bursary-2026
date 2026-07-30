@@ -62,6 +62,8 @@ def train_one_epoch(
             z_negs = None
 
         batch = EmbeddingBatch(
+            org_view1=emb1,
+            org_view2=emb2,
             proj_view1=z1,
             proj_view2=z2,
             negatives=z_negs,
@@ -137,6 +139,8 @@ def evaluate(
                 z_negs = None
 
             batch = EmbeddingBatch(
+                org_view1=emb1,
+                org_view2=emb2,
                 proj_view1=z1,
                 proj_view2=z2,
                 negatives=z_negs,

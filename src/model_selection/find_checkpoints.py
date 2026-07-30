@@ -8,8 +8,8 @@ def get_checkpoints(directory: Path) -> list[Path]:
     return sorted(
         (
             path
-            for path in directory.glob("*.pt")
-            if path.is_file()
+            for path in directory.iterdir()
+            if path.is_dir() and (path / "model.pt").exists()
         ),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
