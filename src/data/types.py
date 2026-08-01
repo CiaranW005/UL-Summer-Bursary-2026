@@ -19,8 +19,10 @@ class Embeddings:
 class DinoFeatures(TypedDict):
     x_norm_clstoken : torch.Tensor
     x_norm_patchtokens: torch.Tensor
+    x_prenorm: torch.Tensor
 
 class DinoModel(nn.Module):
+    norm : nn.Module
     blocks: Sequence[nn.Module]
 
     def forward_features(

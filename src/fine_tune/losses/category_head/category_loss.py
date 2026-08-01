@@ -2,16 +2,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 class CategoryContLoss(nn.Module):
-    def __init__(self, temperature = 0.1):
+    def __init__(self, temperature: float = 0.1):
         super().__init__()
         self.temperature = temperature
 
     def forward(
         self,
-        embeddings,
-        labels
-    ):
+        embeddings : torch.Tensor,
+        labels: np.ndarray
+    )-> tuple[torch.Tensor, dict[str, float]]:
         embeddings = F.normalize(embeddings, dim=-1)
 
         similarities = embeddings @ embeddings.T
@@ -34,11 +36,12 @@ class CategoryContLoss(nn.Module):
             same_sim = similarities[positive_mask].mean()
             diff_sim = similarities[negative_mask].mean()
 
-            print(
-                f"same={same_sim.item():.4f}, "
-                f"different={diff_sim.item():.4f}, "
-                f"gap={(same_sim - diff_sim).item():.4f}"
-            )
+            cosines = {
+                    "same": same_sim.item(),
+                    "different": diff_sim.item(),
+                    "gap": (same_sim-diff_sim).item()
+            }
+            
         logits = logits.masked_fill(self_mask, float("-inf"))
 
         log_prob = logits - torch.logsumexp(
@@ -57,7 +60,7 @@ class CategoryContLoss(nn.Module):
         )
 
         if not valid.any():
-            return embeddings.sum() * 0.0
+            return embeddings.sum() * 0.0, cosines
         
-        return -mean_pos_log_prob[valid].mean()
+        return -mean_pos_log_prob[valid].mean(), cosines
     

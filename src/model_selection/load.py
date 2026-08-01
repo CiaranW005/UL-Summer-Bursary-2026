@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import cast, Any
 
+from PIL.ImagePalette import raw
 import torch
 
 from src.data.types import DinoModel
@@ -122,13 +123,15 @@ def load_inference_models(
     checkpoint = load_checkpoint(model_path, device=device)
 
     parent_models = checkpoint["parent_models"]
-    dino_path = parent_models.get("dino")
+    raw = parent_models.get("dino")
+
+    dino_path = None if raw == "None" else Path(raw)
 
     pipeline = EmbeddingPipeline(
         stages=[PipelineStage(
             name="dino",
             model=load_dino(checkpoint_path=dino_path, device=device),
-            path=Path(dino_path)
+            path=dino_path
         )]
     )
 

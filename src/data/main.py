@@ -8,7 +8,7 @@ from pathlib import Path
 
 import json
 
-from ..config.paths import MODELS, EMBEDS_DIR, FAISS_DIR
+from ..config.paths import MODELS, EMBEDS_DIR, FAISS_DIR, DB_PATH
 from ..model_selection import get_checkpoints, load_inference_models, EmbeddingPipeline
 
 from .create_metadata import create_metadata
@@ -135,8 +135,9 @@ if __name__ == "__main__":
     os.makedirs(EMBEDS_DIR, exist_ok=True)
     os.makedirs(FAISS_DIR, exist_ok=True)
 
-    create_metadata()
-    build_metadata_db()
+    if not DB_PATH.exists():
+        create_metadata()
+        build_metadata_db()
 
     loader = preprocess()
 

@@ -2,29 +2,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from typing import cast
 """
 Used to preserve how much info from base model(Dino)
 Based on how similar embeddings are to the old ones
 """
 class PreservationLoss(nn.Module):
-    def __init__(self, sim_weight = 1.0, norm_weight = 1.0, eps = 1e-8):
+    def __init__(self, 
+                sim_weight: float = 1.0, 
+                norm_weight :float = 1.0, 
+                eps : float = 1e-8
+        ):
         super().__init__()
         self.sim_weight = sim_weight
         self.norm_weight = norm_weight
 
         self.eps = eps
 
-    def forward(self, org_embeds, proj_embeds):
+    def forward(self, 
+                org_embeds: torch.Tensor, 
+                proj_embeds: torch.Tensor
+            )-> torch.Tensor:
         org_embeds = org_embeds.detach()
 
-        org_norm = org_embeds.norm(
-            dim=-1,
-            keepdim=True,
+        org_norm = cast(torch.Tensor,
+            org_embeds.norm(dim=-1, keepdim=True) # pyright: ignore[reportUnknownMemberType]
         ).clamp_min(self.eps)
 
-        proj_norm = proj_embeds.norm(
-            dim=-1,
-            keepdim=True,
+        proj_norm = cast(torch.Tensor,
+            proj_embeds.norm(dim=-1, keepdim=True) # pyright: ignore[reportUnknownMemberType]
         ).clamp_min(self.eps)
     
         org_unit = org_embeds / org_norm

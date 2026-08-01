@@ -3,18 +3,25 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from collections.abc import Sequence
 
 from .types import Sample, EmbeddingBatch
+from ..model_selection import EmbeddingPipeline
 
-def run_models(
-        x: torch.Tensor, 
-        models: Sequence[nn.Module]
-    ) -> torch.Tensor:
-    """Pass a tensor sequentially through a list of models."""
-    for model in models:
-        x = model(x)
-    return x
+def run_pipeline(
+        views: list[torch.Tensor], 
+        pipeline: EmbeddingPipeline
+    ) -> tuple[torch.Tensor, ...]:
+    """Pass views sequentially through a list of models."""
+    if not views:
+        return ()
+
+    batch_sizes = [v.shape[0] for v in views]
+    x = torch.cat(views, dim=0)
+
+    for stage in pipeline:
+        x = stage.model(x)
+
+    return torch.split(x, batch_sizes, dim=0)
 
 def train_one_epoch(
         model: nn.Module, 
@@ -22,7 +29,7 @@ def train_one_epoch(
         criterion: nn.Module, 
         optimizer: Optimizer, 
         device: torch.device,
-        inf_models: list[nn.Module] | None = None
+        pipeline: EmbeddingPipeline = EmbeddingPipeline(stages=[])
     ) -> float:
     """Train the projection model for one epoch.
 
@@ -42,24 +49,14 @@ def train_one_epoch(
 
         optimizer.zero_grad()
 
-        # Get embeddings from frozen dino
-        if inf_models is not None:
-            with torch.no_grad():
-                emb1 = run_models(view1, inf_models)
-                emb2 = run_models(view2, inf_models)
-        else:
-            emb1 = view1
-            emb2 = view2
-
-
+        with torch.no_grad():
+            emb1, emb2 = run_pipeline([view1, view2], pipeline)
+  
         # Embeddings from the projection head 
         z1 = model(emb1)
         z2 = model(emb2)
 
-        if hasattr(criterion, "negatives"):
-            z_negs = model(criterion.negatives)
-        else:
-            z_negs = None
+        z_negs = model(criterion.negatives) if hasattr(criterion, "negatives") else None
 
         batch = EmbeddingBatch(
             org_view1=emb1,
@@ -75,17 +72,17 @@ def train_one_epoch(
         
         loss.backward()
 
-        grad_norm_sq: float = 0.0
+        grad_norm_sq = torch.tensor(0.0, device=device)
         for parameter in model.parameters():
             grad = parameter.grad
 
             if grad is None:
                 continue
 
-            grad_norm_sq += float(torch.sum(grad * grad).item())
+            grad_norm_sq += grad.square().sum()
 
         # TODO: Log grad_norm
-        grad_norm = grad_norm_sq**0.5
+        grad_norm = grad_norm_sq.sqrt().item()
 
         before = next(model.parameters()).detach().clone()
 
@@ -102,12 +99,13 @@ def train_one_epoch(
 
     return total_loss / len(dataloader)
 
+@torch.inference_mode()
 def evaluate(
         model: nn.Module, 
         dataloader: DataLoader[Sample], 
         criterion: nn.Module, 
         device: torch.device,
-        inf_models: list[nn.Module] | None = None
+        pipeline: EmbeddingPipeline = EmbeddingPipeline(stages=[])
     ) -> float:
     """Evaluate the projection model.
 
@@ -117,39 +115,30 @@ def evaluate(
     model.eval()
 
     total_loss = 0.0
-    with torch.no_grad():
-        for view1, view2, category, _ in dataloader:
-            view1, view2 = view1.to(device), view2.to(device)
-            category = category.to(device)
 
-            if inf_models is not None:
-                with torch.no_grad():
-                    emb1 = run_models(view1, inf_models)
-                    emb2 = run_models(view2, inf_models)
-            else:
-                emb1 = view1
-                emb2 = view2
+    for view1, view2, category, _ in dataloader:
+        view1, view2 = view1.to(device), view2.to(device)
+        category = category.to(device)
 
-            z1 = model(emb1)
-            z2 = model(emb2)
+        emb1, emb2 = run_pipeline([view1, view2], pipeline)
 
-            if hasattr(criterion, "negatives"):
-                z_negs = model(criterion.negatives)
-            else:
-                z_negs = None
+        z1 = model(emb1)
+        z2 = model(emb2)
 
-            batch = EmbeddingBatch(
-                org_view1=emb1,
-                org_view2=emb2,
-                proj_view1=z1,
-                proj_view2=z2,
-                negatives=z_negs,
-                categories=category
-            )
+        z_negs = model(criterion.negatives) if hasattr(criterion, "negatives") else None
 
-            loss, _ = criterion(batch)
+        batch = EmbeddingBatch(
+            org_view1=emb1,
+            org_view2=emb2,
+            proj_view1=z1,
+            proj_view2=z2,
+            negatives=z_negs,
+            categories=category
+        )
 
-            total_loss += loss.item()
+        loss, _ = criterion(batch)
+
+        total_loss += loss.item()
 
     if len(dataloader) == 0:
             raise RuntimeError("Evaluation dataloader produced no batches.")

@@ -34,7 +34,8 @@ class CombinedLoss(nn.Module):
             projected = torch.cat([batch.proj_view1, batch.proj_view2], dim=0)
             categories = torch.cat([batch.categories, batch.categories], dim=0)
 
-            category_loss = self.losses["category_cont"](projected, categories)
+            # TODO: return cosines to log
+            category_loss, cosines = self.losses["category_cont"](projected, categories)
 
             total_loss = total_loss + self.weights.get("category_cont", 1.0) * category_loss
 
