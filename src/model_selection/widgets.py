@@ -21,7 +21,7 @@ class ModelSelector:
     selected_path: Path | None | Literal["UNSELECTED"] = UNSELECTED
 
     def __post_init__(self) -> None:
-        self.confirm_button.on_click(self._confirm_selection) # pyright: ignore[reportUnknownMemberType]
+        self.confirm_button.on_click(self._confirm_selection) 
 
         self.dino_selector.observe(
             self._invalidate_selection,
@@ -47,14 +47,14 @@ class ModelSelector:
             return
         
         if self.use_category_head.value:
-            self.dino_selector.layout.display = "none" # pyright: ignore[reportUnknownMemberType]
-            self.category_head_selector.layout.display = "" # pyright: ignore[reportUnknownMemberType]
+            self.dino_selector.layout.display = "none" 
+            self.category_head_selector.layout.display = "" 
         else:
-            self.dino_selector.layout.display = "" # pyright: ignore[reportUnknownMemberType]
-            self.category_head_selector.layout.display = "none" # pyright: ignore[reportUnknownMemberType]
+            self.dino_selector.layout.display = "" 
+            self.category_head_selector.layout.display = "none" 
 
     def _confirm_selection(self, _: widgets.Button) -> None:
-        self.output.clear_output()  # pyright: ignore[reportUnknownMemberType]
+        self.output.clear_output() 
 
         with self.output:
             use_category = (self.use_category_head is not None and self.use_category_head.value)
@@ -62,16 +62,15 @@ class ModelSelector:
             if use_category:
                 if self.category_head_selector is None:
                     raise RuntimeError("Category head selector is missing.")
-                
-                selected = cast(Path | None | Literal["UNSELECTED"], self.category_head_selector.value) # pyright: ignore[reportUnknownMemberType]
 
+                selected = cast(Path | None | Literal["UNSELECTED"], self.category_head_selector.value) 
                 if selected is None:
                     print("Select a category head first.")
                     return
 
                 self.selected_path = selected
             else:
-                selected = cast(Path | None | Literal["UNSELECTED"], self.dino_selector.value) # pyright: ignore[reportUnknownMemberType]
+                selected = cast(Path | None | Literal["UNSELECTED"], self.dino_selector.value) 
 
                 if selected == UNSELECTED:
                     print("Select a DINO model first.")

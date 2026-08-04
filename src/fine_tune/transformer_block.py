@@ -46,7 +46,7 @@ class AnomalyDinoBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
 
-class DinoAnomalyAdapter(nn.Module):
+class DinoBlockExtension(nn.Module):
     def __init__(
             self,
             dino: DinoModel,
@@ -57,7 +57,7 @@ class DinoAnomalyAdapter(nn.Module):
         self.adapter = AnomalyDinoBlock() # FIXME: Initialize with appropriate parameters so its configureable
         self.norm = nn.LayerNorm(384, eps=1e-6) # FIXME: Use those initalised paramter for the correct dimension even though it will more than likely stay as 384
 
-    def train(self, mode: bool = True)-> "DinoAnomalyAdapter":
+    def train(self, mode: bool = True)-> "DinoBlockExtension":
         super().train(mode)
 
         self.adapter.train(mode)

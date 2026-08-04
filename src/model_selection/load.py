@@ -6,6 +6,7 @@ import torch
 
 from src.data.types import DinoModel
 from src.fine_tune.model import ProjectionHead
+from src.fine_tune.transformer_block import DinoBlockExtension
 
 from .types import EmbeddingPipeline, PipelineStage
 
@@ -25,7 +26,7 @@ def load_dino(
 ) -> DinoModel:
     dino = cast(
         DinoModel,
-        torch.hub.load(  # pyright: ignore[reportUnknownMemberType]
+        torch.hub.load(
             repo_or_dir="facebookresearch/dinov2",
             model="dinov2_vits14",
         ),
@@ -87,6 +88,33 @@ def load_projection_head(
 
     return model
 
+def load_anomaly_adapter(
+    checkpoint_path: Path,
+    dino: DinoModel,
+    device: torch.device,
+) -> DinoBlockExtension:
+    print("Loading anomaly adapter:", checkpoint_path)
+
+    checkpoint = load_checkpoint(
+            checkpoint_path,
+            device=device
+        )
+
+    # TODO: Add it so parameters can be intialised in the adapter block
+    parameters = checkpoint["parameters"]
+
+    model = DinoBlockExtension(dino=dino)
+
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    model.to(device)
+    model.eval()
+
+    for p in model.parameters():
+        p.requires_grad = False
+
+    return model
+
 def load_inference_models(
     model_dir: Path | None,
     device: torch.device
@@ -114,8 +142,9 @@ def load_inference_models(
 
     is_category_head = "category_head" in model_path.parts
     is_anomaly_head = "anomaly_head" in model_path.parts
+    is_dino_adapter_block = "dino_adapter_block" in model_path.parts
 
-    if not is_category_head and not is_anomaly_head:
+    if not is_category_head and not is_anomaly_head and not is_dino_adapter_block:
         raise ValueError(
             f"Unknown model checkpoint location: {model_path}"
         )
@@ -125,8 +154,19 @@ def load_inference_models(
     parent_models = checkpoint["parent_models"]
     raw = parent_models.get("dino")
 
-    dino_path = None if raw == "None" else Path(raw)
+    dino_path = None if raw in ("None", None) else Path(raw)
 
+    if "dino_adapter_block" in model_path.parts:
+        dino = load_dino(checkpoint_path=dino_path, device=device)
+
+        return EmbeddingPipeline(
+            stages=[PipelineStage(
+                name="dino",
+                model=load_anomaly_adapter(checkpoint_path=model_path, dino=dino, device=device),
+                path=model_path
+            )]
+        )
+    
     pipeline = EmbeddingPipeline(
         stages=[PipelineStage(
             name="dino",

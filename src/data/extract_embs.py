@@ -17,8 +17,7 @@ def get_embeddings(
         device: torch.device
         ) -> tuple[dict[str, np.ndarray], np.ndarray]:
 
-    for stage in pipeline:
-        stage.model.eval()
+    pipeline.eval()
 
     embeds = Embeddings(
         cls={stage.name: [] for stage in pipeline},
@@ -48,6 +47,27 @@ def get_embeddings(
 
     patches = torch.cat(embeds.patches).numpy().astype("float32")
     return cls_embeds, patches
+
+@torch.inference_mode()
+def get_adapter_block_embeddings(
+        pipeline: EmbeddingPipeline,
+        loader: DataLoader[torch.Tensor], 
+        device: torch.device
+        ) -> np.ndarray:
+    """
+    Custom extractor for the adpater block as it require dinos pre_norm tokens
+    """
+
+    pipeline.eval()
+
+    cls_embeds = []
+    for images in tqdm(loader):
+        images = images.to(device)
+
+
+        cls_embeds.append(pipeline.dino(images))
+
+    return torch.cat(cls_embeds).cpu().numpy().astype("float32")
 
 @torch.inference_mode()
 def get_layer_embeddings(

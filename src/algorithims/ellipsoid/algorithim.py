@@ -26,7 +26,6 @@ class EllipsoidCover:
         neighbourhood, is cleaned to avoid encroaching on already covered
         points, and is then expanded while it gains additional points.
         """
-
         uncovered_mask = np.ones(len(embeds), dtype=bool)
         ellipsoids: list[Ellipsoid] = []
 
@@ -34,6 +33,7 @@ class EllipsoidCover:
             # Work only with currently uncovered embeddings
             uncovered_idx = np.where(uncovered_mask)[0]
             uncovered_emb = embeds[uncovered_idx].astype("float32")
+            print("Copied uncovered embeds")
 
             k = max(2, int(k_frac * len(uncovered_idx)))
             k = min(k, len(uncovered_idx) - 1)
@@ -46,6 +46,7 @@ class EllipsoidCover:
                 X = embeds[covered_idx]
                 weights = np.ones(len(covered_idx))
 
+                print("fitting small elipsoid")
                 if len(ellipsoids) > 0:
                     ellipsoid = self.fitter.fit_supported(X, weights, ellipsoids)
                 else:
@@ -56,8 +57,11 @@ class EllipsoidCover:
             else:
                 index = faiss.IndexFlatL2(uncovered_emb.shape[1])
                 index.add(uncovered_emb)
+                print("created faiss index", flush=True)
 
-                dist, nbrs = index.search(uncovered_emb.astype("float32"), k=k+1) # +1 as nearest is itself 
+                print("Searching faiss", flush=True)
+                dist, nbrs = index.search(uncovered_emb, k=k+1) # +1 as nearest is itself 
+                print("finshed search", flush=True)
 
                 dist = dist[:, 1:]    # Remove self
                 nbrs = nbrs[:, 1:]
@@ -72,6 +76,8 @@ class EllipsoidCover:
                 full_covered_idx = uncovered_idx[np.r_[local_compact, nbrs_local]]
 
                 weights = np.ones(len(full_covered_idx))
+
+                print("Cleanign candidate", flush=True)
                 self.cleaner.min_points = 1
                 ellipsoid = self.cleaner.clean_candidate(
                     full_covered_idx,
@@ -80,26 +86,33 @@ class EllipsoidCover:
                     weights,
                     ellipsoids
                 )
+                print("finished cleaning", flush=True)
 
                 while True:
+                    print("growing candidate", flush=True)
                     candidate_mask = self.fitter.grow(embeds, ellipsoid, growth)
+                    print("finsihed growing", flush=True)
+
                     full_new_covered_idx = np.where(candidate_mask & uncovered_mask)[0]
 
                     if len(full_new_covered_idx) == 0:
                         break
 
                     # Preserve previously reduced wieghts for points retained during growth
+                    print("presevring old weights", flush=True)
                     _, old_pos, new_pos = np.intersect1d(
                         ellipsoid.covered_idx,
                         full_new_covered_idx,
                         return_indices=True
                     )
+
                     grow_weights = np.ones(len(full_new_covered_idx))
                     grow_weights[new_pos] = ellipsoid.weights[old_pos]
 
                     weights = grow_weights
 
                     # Do not allow cleaning to shrink a grown candidate below its previous size.
+                    print("cleaning grown candidate")
                     self.cleaner.min_points = len(ellipsoid.covered_idx)
                     new_ellipsoid = self.cleaner.clean_candidate(
                         full_new_covered_idx, 
@@ -108,6 +121,7 @@ class EllipsoidCover:
                         weights,
                         ellipsoids
                         ) 
+                    print("finsihed cleaning")
 
                     if len(new_ellipsoid.covered_idx) > len(ellipsoid.covered_idx):
                         ellipsoid = new_ellipsoid
