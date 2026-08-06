@@ -2,9 +2,7 @@
 import numpy as np
 import pandas as pd 
 
-import multiprocessing as mp
-from multiprocessing import shared_memory
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, asdict, field
 
 from tqdm.auto import tqdm
 
@@ -13,155 +11,53 @@ from collections.abc import Callable
 from .algorithim import EllipsoidCover
 from .evaluator import EllipsoidEvaluator
 
-CoverFactory = Callable[[], EllipsoidCover]
-EvalFactory = Callable[[], EllipsoidEvaluator]
+from ..types import EllipsoidCollection
+from ...stats.mahlanobis_detector import MahalanobisDetector
 
-_WORKER_TRAIN: np.ndarray | None = None
-_WORKER_GOOD: np.ndarray | None = None
-_WORKER_DEFECT: np.ndarray | None = None
+@dataclass
+class BootstrapResults:
+    bootstrap: int
 
-_WORKER_SHM: list[shared_memory.SharedMemory] = []
+    alg_score: float
+    mal_score: float
 
-def create_shared_array(
-    array: np.ndarray
-) -> tuple[shared_memory.SharedMemory, tuple[int, ...], str]:
-    contiguous = np.ascontiguousarray(array)
+    delta: float = field(init=False)
 
-    shm = shared_memory.SharedMemory(
-        create=True,
-        size=contiguous.nbytes
-    )
+    def __post_init__(self) -> None:
+        self.delta = self.alg_score - self.mal_score
 
-    shared_view = np.ndarray(
-        contiguous.shape,
-        dtype=contiguous.dtype,
-        buffer=shm.buf
-    )
+@dataclass
+class TrainBootstrapResults(BootstrapResults):
+    n_ellipsoids: int
 
-    shared_view[:] = contiguous
+    mean_n_points: float
+    median_n_points: float
 
-    return shm, contiguous.shape, contiguous.dtype.str
+    fraction_supported: float
 
-def _init_worker(
-    train_name: str,
-    train_shape: tuple[int, ...],
-    train_dtype: str,
-    good_name: str,
-    good_shape: tuple[int, ...],
-    good_dtype: str,
-    defect_name: str,
-    defect_shape: tuple[int, ...],
-    defect_dtype: str
-) -> None:
-    global _WORKER_TRAIN
-    global _WORKER_GOOD
-    global _WORKER_DEFECT
-    global _WORKER_SHM
+    pc95_mean: float # avg min component to explain 95% of the variance
+    pc95_median: float
 
-    train_shm = shared_memory.SharedMemory(name=train_name)
-    good_shm = shared_memory.SharedMemory(name=good_name)
-    defect_shm = shared_memory.SharedMemory(name=defect_name)
-
-    _WORKER_SHM = [
-        train_shm,
-        good_shm,
-        defect_shm
-    ]
-
-    _WORKER_TRAIN = np.ndarray(
-        train_shape,
-        dtype=np.dtype(train_dtype),
-        buffer=train_shm.buf
-    )
-
-    _WORKER_GOOD = np.ndarray(
-        good_shape,
-        dtype=np.dtype(good_dtype),
-        buffer=good_shm.buf
-    )
-
-    _WORKER_DEFECT = np.ndarray(
-        defect_shape,
-        dtype=np.dtype(defect_dtype),
-        buffer=defect_shm.buf
-    )
-
-    _WORKER_TRAIN.flags.writeable = False
-    _WORKER_GOOD.flags.writeable = False
-    _WORKER_DEFECT.flags.writeable = False
-
-def _run_train_bootstrap(
-    bootstrap_indices: list[int],
-    seeds: list[int],
-    cover_factory: CoverFactory,
-    eval_factory: EvalFactory,
-)-> list[dict[str, float | int]]:
-    if (
-        _WORKER_TRAIN is None 
-        or _WORKER_GOOD is None
-        or _WORKER_DEFECT is None
-    ):
-        raise RuntimeError(
-            "Worker embeddings were not initialised before creating the pool"
-        )
-    
-    cover = cover_factory()
-    evaluator = eval_factory()
-
-    results: list[dict[str, float | int]] = []
-
-    for idx, seed in tqdm(zip(
-            bootstrap_indices,
-            seeds,
-            strict=True
-        ),
-        desc=f"Train Bootstrap [{bootstrap_indices[0]}-{bootstrap_indices[-1]}]",
-        position=bootstrap_indices[0] // max(1, len(bootstrap_indices)),
-        total=len(bootstrap_indices),
-        leave=False
-    ):
-        rng = np.random.default_rng(seed)
-
-        sample_idx = rng.choice(
-            len(_WORKER_TRAIN),
-            len(_WORKER_TRAIN),
-            replace=True
-        )
-  
-        train_bootstrap = _WORKER_TRAIN[sample_idx]
-        ellipsoids, _ = cover.run(embeds=train_bootstrap)
-
-        _, metrics = evaluator.evaluate_detection(
-            good_test_emb=_WORKER_GOOD,
-            defect_test_emb=_WORKER_DEFECT,
-            ellipsoids=ellipsoids
-        )
-        
-        results.append({
-            "bootstrap": idx,
-            "auroc": float(metrics["auroc"]),
-            "n_ellipsoids": len(ellipsoids),
-        })
-
-    return results
+    pc1_ratio_mean: float
+    rank_mean: float
 
 class BootstrapRunner:
     def __init__(self, 
-                cover_factory: CoverFactory, 
-                eval_factory: EvalFactory, 
+                cover: EllipsoidCover, 
+                evaluator: EllipsoidEvaluator,
+                mal_detector: MahalanobisDetector,
                 n_test_bootstraps: int = 1000,
                 n_train_bootstraps: int = 100, 
                 seed: int = 42,
-                max_workers: int = 2
         ) -> None:
-        self.cover_factory = cover_factory
-        self.eval_factory = eval_factory
+        self.cover = cover
+        self.evaluator = evaluator
+        self.mal_detector = mal_detector
 
         self.test_bootstraps = n_test_bootstraps
         self.train_bootstraps = n_train_bootstraps
 
-        self.seed = seed
-        self.max_workers = max_workers
+        self.rng = np.random.default_rng(seed)
 
     def run(self,
             train_emb: np.ndarray,
@@ -187,22 +83,25 @@ class BootstrapRunner:
             good_test_emb: np.ndarray,
             defect_test_emb: np.ndarray
         )-> pd.DataFrame:
-        rng = np.random.default_rng(self.seed)
-        results: list[float] = []
+        results: list[BootstrapResults] = []
 
-        cover = self.cover_factory()
-        eval = self.eval_factory()
+        collection = self.cover.run(embeds=train_emb)
+        self.mal_detector.fit(train_emb)
 
-        ellipsoids, _ = cover.run(embeds=train_emb)
-        for _ in tqdm(range(self.test_bootstraps), desc="Test Bootstraps"):
-            # Good and test ratios should remain the same
-            good_idx = rng.choice(
+        for idx in tqdm(
+            range(self.test_bootstraps), 
+            desc="Test Bootstraps",
+            mininterval=1.0,
+            miniters=50
+            ):
+            # Good and defect test ratios should remain the same
+            good_idx = self.rng.choice(
                 len(good_test_emb),
                 len(good_test_emb),
                 replace=True
             )
 
-            defect_idx = rng.choice(
+            defect_idx = self.rng.choice(
                 len(defect_test_emb),
                 len(defect_test_emb),
                 replace=True
@@ -211,113 +110,93 @@ class BootstrapRunner:
             good_boot_emb = good_test_emb[good_idx]
             defect_boot_emb = defect_test_emb[defect_idx]
 
-            _, metrics = eval.evaluate_detection(
+            _, metrics = self.evaluator.evaluate_detection(
                 good_test_emb=good_boot_emb,
                 defect_test_emb=defect_boot_emb,
-                ellipsoids=ellipsoids
+                collection=collection
             )
 
-            results.append(metrics["auroc"])
+            mal_score = self.mal_detector.evaluate_detection(
+                good_embeds=good_boot_emb,
+                defect_embeds=defect_boot_emb
+            )
 
-        return pd.DataFrame({
-            "bootstrap": np.arange(self.test_bootstraps),
-            "auroc": results,
-        })
+            results.append(BootstrapResults(
+                bootstrap=idx, 
+                alg_score=metrics["auroc"],
+                mal_score=mal_score,
+            ))
+
+        return pd.DataFrame(asdict(r) for r in results)
 
     def bootstrap_train_embeds(self,
             train_emb: np.ndarray,
             good_test_emb: np.ndarray,
             defect_test_emb: np.ndarray
         )-> pd.DataFrame:
-        seed_seq = np.random.SeedSequence(self.seed)
 
-        seeds = [
-            int(child.generate_state(1)[0])
-            for child in seed_seq.spawn(self.train_bootstraps)
-        ]
+        results: list[TrainBootstrapResults] = []
 
-        bootstrap_indices = np.arange(self.train_bootstraps)
-
-        index_chunks = [
-        chunk.tolist()
-        for chunk in np.array_split(
-            bootstrap_indices,
-            self.max_workers
-        )
-        if len(chunk) > 0
-        ]
-
-        seed_chunks = [
-            chunk.tolist()
-            for chunk in np.array_split(
-                seeds,
-                self.max_workers
+        for idx in tqdm(range(self.train_bootstraps), desc="Train Bootstraps"):
+            sample_idx = self.rng.choice(
+                len(train_emb),
+                len(train_emb),
+                replace=True
             )
-            if len(chunk) > 0
-        ]
 
-        train_shm, train_shape, train_dtype = create_shared_array(train_emb)
-        good_shm, good_shape, good_dtype = create_shared_array(good_test_emb)
-        defect_shm, defect_shape, defect_dtype = create_shared_array(defect_test_emb)
+            train_bootstrap = train_emb[sample_idx]
+            self.mal_detector.fit(train_bootstrap)
+            collection = self.cover.run(embeds=train_bootstrap)
 
-        results: list[dict[str, float | int]] = []
-        try:
-            with ProcessPoolExecutor(
-                max_workers=self.max_workers,
-                mp_context=mp.get_context("forkserver"),
-                initializer=_init_worker,
-                initargs=(
-                    train_shm.name,
-                    train_shape,
-                    train_dtype,
-                    good_shm.name,
-                    good_shape,
-                    good_dtype,
-                    defect_shm.name,
-                    defect_shape,
-                    defect_dtype,
-                )
-            ) as executor:
-                futures = [
-                    executor.submit(
-                        _run_train_bootstrap,
-                        index_chunk,
-                        seed_chunk,
-                        self.cover_factory,
-                        self.eval_factory,
-                    )
-                    for index_chunk, seed_chunk in zip(
-                        index_chunks,
-                        seed_chunks,
-                        strict=True,
-                    )
-                ]
+            _, metrics = self.evaluator.evaluate_detection(
+                good_test_emb=good_test_emb,
+                defect_test_emb=defect_test_emb,
+                collection=collection
+            )
 
-                for future in as_completed(futures):
-                    results.extend(future.result())
-        finally:
-            train_shm.close()
-            train_shm.unlink()
+            mal_score = self.mal_detector.evaluate_detection(
+                good_embeds=good_test_emb,
+                defect_embeds=defect_test_emb
+            )
 
-            good_shm.close()
-            good_shm.unlink()
+            stats_df = collection.to_dataframe()
 
-            defect_shm.close()
-            defect_shm.unlink()
+            results.append(TrainBootstrapResults(
+                bootstrap=idx,
+                alg_score=metrics["auroc"],
+                mal_score=mal_score,
+                n_ellipsoids=len(collection),
 
-        return (
-            pd.DataFrame(results)
-            .sort_values("bootstrap")
-            .reset_index(drop=True)
-        )
+                mean_n_points=float(stats_df["n_points"].mean()),
+                median_n_points=stats_df["n_points"].median(),
+
+                fraction_supported=stats_df["support_id"].notna().mean(),
+
+                pc95_mean=stats_df["pc95"].mean(),
+                pc95_median=stats_df["pc95"].median(),
+
+                pc1_ratio_mean=stats_df["pc1_ratio"].mean(),
+                rank_mean=stats_df["rank"].mean()
+            ))
+
+        return (pd.DataFrame(asdict(r) for r in results))
 
     @staticmethod
     def summarise_bootstrap(df: pd.DataFrame) -> pd.Series:
-        return pd.Series({
-            "mean": df["auroc"].mean(),
-            "std": df["auroc"].std(),
-            "ci_lower": df["auroc"].quantile(0.025),
-            "ci_upper": df["auroc"].quantile(0.975),
-        })
+        summary: dict[str, float | int] = {}
+
+        for col in df.columns:
+            if col == "bootstrap" or col == "category":
+                continue
+
+            if df[col].std() == 0:
+                summary[col] = df[col].iloc[0]
+            else:
+                summary[f"{col}_mean"] = df[col].mean()
+                summary[f"{col}_std"] = df[col].std()
+                summary[f"{col}_ci_lower"] = df[col].quantile(0.025)
+                summary[f"{col}_ci_upper"] = df[col].quantile(0.975)
+
+        return pd.Series(summary)
 
 

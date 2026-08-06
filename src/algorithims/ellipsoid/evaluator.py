@@ -6,7 +6,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 
 from collections.abc import Sequence
 
-from ..types import Ellipsoid, EllipsoidOverlapResult, BucketAUROC
+from ..types import Ellipsoid, EllipsoidOverlapResult, BucketAUROC, EllipsoidCollection
 
 class EllipsoidEvaluator:
     @staticmethod
@@ -94,7 +94,7 @@ class EllipsoidEvaluator:
     def evaluate_detection(self, 
                     good_test_emb: np.ndarray, 
                     defect_test_emb: np.ndarray, 
-                    ellipsoids: Sequence[Ellipsoid]
+                    collection: EllipsoidCollection
                 )-> tuple[pd.DataFrame, dict[str, float]]:
         """Evaluate anomaly detection performance on the test set.
 
@@ -108,7 +108,7 @@ class EllipsoidEvaluator:
             np.ones(len(defect_test_emb)),
         ])
 
-        scores, best_ellipsoid = self.score_samples(X, ellipsoids)
+        scores, best_ellipsoid = self.score_samples(X, collection.ellipsoids)
 
         auroc = float(roc_auc_score(y_true, scores))
 
@@ -118,8 +118,8 @@ class EllipsoidEvaluator:
         predicted_label = (scores > best_threshold).astype(int)
         correct = predicted_label == y_true
 
-        n_points = np.array([len(e.covered_idx) for e in ellipsoids])
-        eig_ratios = np.array([e.eig_ratio for e in ellipsoids])
+        n_points = np.array([e.n_points for e in collection.stats])
+        eig_ratios = np.array([e.raw_eig_ratio for e in collection.stats])
 
         # Record properties of the ellipsoid producing the best score.
         results_df = pd.DataFrame({

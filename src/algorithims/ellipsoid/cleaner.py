@@ -4,7 +4,8 @@ from collections.abc import Sequence
 
 from .fitter import EllipsoidFitter
 
-from ..types import Ellipsoid
+from ..types import Ellipsoid, EllipsoidFit
+
 class CandidateCleaner:
     def __init__(self, fitter: EllipsoidFitter, min_points: int =1):
         self.fitter = fitter
@@ -17,22 +18,23 @@ class CandidateCleaner:
                     uncovered_mask: np.ndarray, 
                     weights: np.ndarray, 
                     ellipsoids: Sequence[Ellipsoid]
-                ) -> Ellipsoid:
+                ) -> EllipsoidFit:
         """Shrink candidate-point weights until the encroachment is removed"""
 
         while len(covered_idx) > self.min_points:
             X = embeds[covered_idx]
 
-            ellipsoid = self._fit_candidate(X, weights, ellipsoids)
+            fit = self._fit_candidate(X, weights, ellipsoids)
 
-            inside_all = self.fitter.inside(embeds, ellipsoid)
+            inside_all = self.fitter.inside(embeds, fit.ellipsoid)
             shared_idx = np.where((inside_all) & (~uncovered_mask))[0]
 
             if len(shared_idx) == 0:
-                ellipsoid.covered_idx = covered_idx
-                return ellipsoid
+                fit.set_covered_idx(covered_idx)
+                return fit
 
             print("Encroachment Detected")
+            ellipsoid = fit.ellipsoid
 
             shared_diff = embeds[shared_idx] - ellipsoid.center
             shared_proj = shared_diff @ ellipsoid.eigvecs
@@ -54,12 +56,12 @@ class CandidateCleaner:
 
         T = embeds[covered_idx]
         if len(covered_idx) < self.fitter.support_points and len(ellipsoids) > 0:
-            ellipsoid = self.fitter.fit_supported(T, weights, ellipsoids)
+            fit = self.fitter.fit_supported(T, weights, ellipsoids)
         else:
-            ellipsoid = self.fitter.fit(T, weights)
+            fit = self.fitter.fit(T, weights)
         
-        ellipsoid.covered_idx = covered_idx
-        return ellipsoid
+        fit.set_covered_idx(covered_idx)
+        return fit
     
 
     def find_weight(self, 
@@ -80,9 +82,9 @@ class CandidateCleaner:
             mid = (lo + hi) / 2
             
             test_weights[worst_local] = mid
-            ellipsoid = self._fit_candidate(X, test_weights, ellipsoids)
+            fit = self._fit_candidate(X, test_weights, ellipsoids)
 
-            inside_all = self.fitter.inside(embeds, ellipsoid)
+            inside_all = self.fitter.inside(embeds, fit.ellipsoid)
             shared_idx = np.where((inside_all) & (~uncovered_mask))[0]
 
             if len(shared_idx) == 0:
@@ -98,7 +100,7 @@ class CandidateCleaner:
                 X: np.ndarray,
                 weights: np.ndarray,
                 ellipsoids: Sequence[Ellipsoid]
-            )-> Ellipsoid:
+            )-> EllipsoidFit:
         """Fits a candidate using its own points or supported when too few points are available"""
 
         if (len(X) < self.fitter.support_points and len(ellipsoids) > 0):
