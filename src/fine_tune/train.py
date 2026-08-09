@@ -37,6 +37,18 @@ if TYPE_CHECKING:
     from .logger import TrainLogger
     from .types import Sample, TrainingObjects, ModelInfo
 
+def in_notebook() -> bool:
+    try:
+        from IPython.core.getipython import get_ipython
+
+        shell = get_ipython()
+        return (
+            shell is not None
+            and shell.__class__.__name__ == "ZMQInteractiveShell"
+        )
+    except (ImportError, NameError):
+        return False
+    
 def run_pipeline(
         views: torch.Tensor, 
         pipeline: EmbeddingPipeline
@@ -374,10 +386,14 @@ class Trainer:
 
         val_window = deque(maxlen=5)
 
+        is_notebook = in_notebook()
+
         pbar = tqdm(total=epochs, desc="Training")
 
-        table_out = widgets.Output()
-        display(table_out)
+        table_out = None
+        if is_notebook:
+            table_out = widgets.Output()
+            display(table_out)
 
         try:
             for epoch in range(epochs):
@@ -403,9 +419,19 @@ class Trainer:
                     "time": f"{elapsed:.2f}"
                 }
 
-                with table_out:
-                    table_out.clear_output(wait=True)
-                    display(history.style.hide(axis="index"))
+                if table_out is not None:
+                    with table_out:
+                        table_out.clear_output(wait=True)
+                        display(history.style.hide(axis="index"))
+                else:
+                    tqdm.write(
+                        f"Epoch {epoch + 1:02d} | "
+                        f"train={train_loss:.4f} | "
+                        f"val={val_loss:.4f} | "
+                        f"gap={abs(val_loss - train_loss):.4f} | "
+                        f"time={elapsed:.2f}s"
+                    )
+                    
                 pbar.update(1)
 
                 val_window.append(val_loss)

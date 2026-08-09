@@ -167,6 +167,9 @@ def run_experiment(
 
         )
     finally:
+        if trainer.logger is not None:
+            trainer.logger.finish()
+            
         del trainer
 
         gc.collect()

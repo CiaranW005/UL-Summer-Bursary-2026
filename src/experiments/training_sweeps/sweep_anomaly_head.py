@@ -22,7 +22,7 @@ def main(pipeline_path: Path | None):
 
     PARAMS: ModelParameters = {
         "seed": 42,
-        "num_workers": 8,
+        "num_workers": 4,
         "pin_memory": torch.cuda.is_available(),
         
         "samples_per_category": 32,
