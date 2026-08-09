@@ -6,25 +6,31 @@ from dataclasses import dataclass, asdict, field
 
 from tqdm.auto import tqdm
 
-from collections.abc import Callable
-
 from .algorithim import EllipsoidCover
 from .evaluator import EllipsoidEvaluator
+from ..types import EvaluationMetrics
 
-from ..types import EllipsoidCollection
-from ...stats.mahlanobis_detector import MahalanobisDetector
+from ...stats.mahalanobis_detector import MahalanobisDetector
 
 @dataclass
 class BootstrapResults:
     bootstrap: int
 
-    alg_score: float
-    mal_score: float
+    alg_metrics: EvaluationMetrics
+    mal_auroc: float
 
     delta: float = field(init=False)
 
     def __post_init__(self) -> None:
-        self.delta = self.alg_score - self.mal_score
+        self.delta = self.alg_metrics.auroc - self.mal_auroc
+
+    def to_dict(self):
+        return {
+            "bootstrap": self.bootstrap,
+            **self.alg_metrics.to_dict(),
+            "mal_auroc": self.mal_auroc,
+            "delta": self.delta,
+        }
 
 @dataclass
 class TrainBootstrapResults(BootstrapResults):
@@ -40,6 +46,19 @@ class TrainBootstrapResults(BootstrapResults):
 
     pc1_ratio_mean: float
     rank_mean: float
+
+    def to_dict(self):
+        return {
+            **super().to_dict(),
+            "n_ellipsoids": self.n_ellipsoids,
+            "mean_n_points": self.mean_n_points,
+            "median_n_points": self.median_n_points,
+            "fraction_supported": self.fraction_supported,
+            "pc95_mean": self.pc95_mean,
+            "pc95_median": self.pc95_median,
+            "pc1_ratio_mean": self.pc1_ratio_mean,
+            "rank_mean": self.rank_mean,
+        }
 
 class BootstrapRunner:
     def __init__(self, 
@@ -110,7 +129,7 @@ class BootstrapRunner:
             good_boot_emb = good_test_emb[good_idx]
             defect_boot_emb = defect_test_emb[defect_idx]
 
-            _, metrics = self.evaluator.evaluate_detection(
+            evaluation = self.evaluator.evaluate_detection(
                 good_test_emb=good_boot_emb,
                 defect_test_emb=defect_boot_emb,
                 collection=collection
@@ -120,14 +139,14 @@ class BootstrapRunner:
                 good_embeds=good_boot_emb,
                 defect_embeds=defect_boot_emb
             )
-
+    
             results.append(BootstrapResults(
                 bootstrap=idx, 
-                alg_score=metrics["auroc"],
-                mal_score=mal_score,
+                alg_metrics=evaluation.metrics,
+                mal_auroc=mal_score,
             ))
 
-        return pd.DataFrame(asdict(r) for r in results)
+        return pd.DataFrame(r.to_dict() for r in results)
 
     def bootstrap_train_embeds(self,
             train_emb: np.ndarray,
@@ -148,7 +167,7 @@ class BootstrapRunner:
             self.mal_detector.fit(train_bootstrap)
             collection = self.cover.run(embeds=train_bootstrap)
 
-            _, metrics = self.evaluator.evaluate_detection(
+            evaluation = self.evaluator.evaluate_detection(
                 good_test_emb=good_test_emb,
                 defect_test_emb=defect_test_emb,
                 collection=collection
@@ -163,8 +182,8 @@ class BootstrapRunner:
 
             results.append(TrainBootstrapResults(
                 bootstrap=idx,
-                alg_score=metrics["auroc"],
-                mal_score=mal_score,
+                alg_metrics=evaluation.metrics,
+                mal_auroc=mal_score,
                 n_ellipsoids=len(collection),
 
                 mean_n_points=float(stats_df["n_points"].mean()),
@@ -179,7 +198,7 @@ class BootstrapRunner:
                 rank_mean=stats_df["rank"].mean()
             ))
 
-        return (pd.DataFrame(asdict(r) for r in results))
+        return (pd.DataFrame(r.to_dict() for r in results))
 
     @staticmethod
     def summarise_bootstrap(df: pd.DataFrame) -> pd.Series:
@@ -189,13 +208,10 @@ class BootstrapRunner:
             if col == "bootstrap" or col == "category":
                 continue
 
-            if df[col].std() == 0:
-                summary[col] = df[col].iloc[0]
-            else:
-                summary[f"{col}_mean"] = df[col].mean()
-                summary[f"{col}_std"] = df[col].std()
-                summary[f"{col}_ci_lower"] = df[col].quantile(0.025)
-                summary[f"{col}_ci_upper"] = df[col].quantile(0.975)
+            summary[f"{col}_mean"] = df[col].mean()
+            summary[f"{col}_std"] = df[col].std()
+            summary[f"{col}_ci_lower"] = df[col].quantile(0.025)
+            summary[f"{col}_ci_upper"] = df[col].quantile(0.975)
 
         return pd.Series(summary)
 

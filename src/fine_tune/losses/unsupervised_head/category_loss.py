@@ -1,10 +1,11 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
 
-class CategoryContLoss(nn.Module):
+from ..types import BaseLoss
+
+class CategoryContLoss(BaseLoss):
     def __init__(self, temperature: float = 0.1):
         super().__init__()
         self.temperature = temperature
@@ -32,15 +33,17 @@ class CategoryContLoss(nn.Module):
         
         negative_mask = labels[:, None] != labels[None, :]
 
-        with torch.no_grad():
-            same_sim = similarities[positive_mask].mean()
-            diff_sim = similarities[negative_mask].mean()
+        cosines = {}
+        if self.collect_metrics:
+            with torch.no_grad():
+                same_sim = similarities[positive_mask].mean()
+                diff_sim = similarities[negative_mask].mean()
 
-            cosines = {
-                    "same": same_sim.item(),
-                    "different": diff_sim.item(),
-                    "gap": (same_sim-diff_sim).item()
-            }
+                cosines = {
+                    "category_contrastive/cosine/same": same_sim.item(),
+                    "category_contrastive/cosine/different": diff_sim.item(),
+                    "category_contrastive/cosine/gap": (same_sim-diff_sim).item()
+                }
             
         logits = logits.masked_fill(self_mask, float("-inf"))
 

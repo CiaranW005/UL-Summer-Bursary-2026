@@ -1,4 +1,6 @@
 import torch
+from torch.utils.data import DataLoader
+
 from pathlib import Path
 
 def get_category(path: Path) -> str:

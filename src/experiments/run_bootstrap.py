@@ -4,7 +4,6 @@ import torch
 import sqlite3
 import pandas as pd
 
-from ..algorithims.ellipsoid.factories import create_cover, create_evaluator
 from ..algorithims.ellipsoid.bootstrap import BootstrapRunner
 
 from ..config.paths import EMBEDS_DIR, EXPERIMENTS, RESULTS, DB_PATH

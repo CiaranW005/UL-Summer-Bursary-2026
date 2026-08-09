@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 import logging
 from collections import defaultdict
@@ -15,7 +16,7 @@ class NegativeSampler:
     """
 
     def __init__(self, 
-            labels : Sequence[tuple[int, int]], 
+            labels : np.ndarray, 
             samples_per_cat: int, 
             types_to_id: dict[str, int], 
             seed: int | None = None
@@ -54,7 +55,6 @@ class NegativeSampler:
                     cat
                 )
                 continue
-            #Add warning 
 
             base = self.samples_per_cat // len(defect_types)
             remainder = self.samples_per_cat % len(defect_types)

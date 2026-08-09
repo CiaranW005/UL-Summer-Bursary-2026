@@ -5,7 +5,7 @@ class ExperimentConfig:
     K_frac : float
     start_growth : float
     min_growth : float
-    reg : float | None = None
+    reg : float 
     growth_type : str | None = None
     cleaner : str | None = None
 

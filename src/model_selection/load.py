@@ -100,10 +100,9 @@ def load_anomaly_adapter(
             device=device
         )
 
-    # TODO: Add it so parameters can be intialised in the adapter block
     parameters = checkpoint["parameters"]
 
-    model = DinoBlockExtension(dino=dino)
+    model = DinoBlockExtension(dino=dino, use_outer_residual=parameters["use_residual"], dropout=parameters["dropout"])
 
     model.load_state_dict(checkpoint["model_state_dict"])
 

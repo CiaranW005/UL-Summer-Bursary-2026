@@ -82,19 +82,49 @@ class EllipsoidCollection:
 
     def __getitem__(self, key: int) -> tuple[Ellipsoid, EllipsoidStats]:
         return self.ellipsoids[key], self.stats[key]
-    
-@dataclass
-class Hypersphere:
-    center: np.ndarray
-    radius: float
-    covered_idx: np.ndarray = field(default_factory=lambda: np.array([], dtype=int))
+ 
+class EvaluationMetrics:
+    def __init__(self, samples: pd.DataFrame, auroc: float, threshold: float):
+        self.auroc = auroc
+        self.best_threshold = threshold
 
+        good = samples["y_true"] == 0
+        defect = samples["y_true"] == 1
+
+        self.accuracy=float(samples["correct"].mean())
+        self.good_accuracy=float(samples.loc[good, "correct"].mean())
+        self.defect_accuracy=float(samples.loc[defect, "correct"].mean())
+
+        self.mean_good_score=float(samples.loc[good, "score"].mean())
+        self.mean_defect_score=float(samples.loc[defect, "score"].mean())
+        self.score_gap=self.mean_defect_score - self.mean_good_score
+
+        self.false_pos=int((good & (samples["predicted_label"] == 1)).sum())
+        self.false_neg=int((defect & (samples["predicted_label"] == 0)).sum())
+
+        self.n_winning_ellipsoid=int(samples["winning_ellipsoid"].nunique())
+        self.max_winning_fraction=float((samples["winning_ellipsoid"].value_counts(normalize=True)).max())
+
+    def to_dict(self) -> dict[str, float | int]:
+        return vars(self)
+
+@dataclass
+class EllipsoidEvaluation:
+    samples: pd.DataFrame
+    metrics: EvaluationMetrics
+    
 class EllipsoidOverlapResult(TypedDict):
     ellipsoid_i: int
     ellipsoid_j: int
     j_points_inside_i: int
     i_points_inside_j: int
     overlap: bool
+
+@dataclass
+class Hypersphere:
+    center: np.ndarray
+    radius: float
+    covered_idx: np.ndarray = field(default_factory=lambda: np.array([], dtype=int))
 
 class HypersphereOverlapResult(TypedDict):
     sphere_i: int

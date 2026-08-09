@@ -3,40 +3,41 @@ from torch.utils.data import Dataset
 from PIL import Image
 from pathlib import Path
 
-from collections.abc import Callable
+import numpy as np
+
+from collections.abc import Callable, Sequence
 
 from .utils import get_category, get_type
 from .types import Sample
 
 class ModelData(Dataset[Sample]):
     def __init__(self, 
-            paths: list[str], 
+            paths: Sequence[str], 
             root: Path, 
             category_to_id: dict[str, int], 
             transform: Callable[[Image.Image], torch.Tensor], 
             types_to_id: dict[str, int] | None = None):
         self.paths = paths
-        self.root = Path(root) 
+        self.root = root 
 
         self.transform = transform
 
-        self.category_ids = [
+        self.category_ids = np.array([
             category_to_id[get_category(self.root / path)]
             for path in self.paths
-        ]
+        ], dtype=np.int8)
 
         self.types_ids = None
         if types_to_id is not None:
-            self.types_ids = [
+            self.types_ids = np.array([
                 types_to_id[get_type(self.root / path)]
                 for path in self.paths
-            ]
+            ], dtype=np.int8)
 
-            self.cat_types_ids = list(zip(
+            self.cat_types_ids = np.column_stack((
                 self.category_ids,
-                self.types_ids
+                self.types_ids,
             ))
-        
 
     def __len__(self):
         return len(self.paths)

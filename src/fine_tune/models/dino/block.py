@@ -20,9 +20,7 @@ from .drop_path import DropPath
 from .layer_scale import LayerScale
 from .mlp import Mlp
 
-
 logger = logging.getLogger("dinov2")
-
 
 class Block(nn.Module):
     def __init__(

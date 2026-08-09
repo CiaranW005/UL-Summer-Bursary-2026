@@ -3,6 +3,7 @@ import numpy as np
 from collections.abc import Sequence
 import logging
 
+from .distance import distance_squared
 from ..types import EllipsoidFit, Ellipsoid, EllipsoidStats
 
 logger =  logging.getLogger(__name__)
@@ -114,29 +115,6 @@ class EllipsoidFitter:
             stats=stats
         )
 
-    def _distance_squared(
-            self,
-            diff: np.ndarray,
-            eigvecs: np.ndarray,
-            eigvals: np.ndarray,
-    ) -> np.ndarray:
-
-        if eigvals.size:
-            proj = diff @ eigvecs
-
-            obs_d2 = np.sum((proj**2) / (eigvals + self.reg), axis=1)
-            proj2_norm = np.sum(proj**2, axis=1)
-        else:
-            obs_d2 = np.zeros(len(diff), dtype=float)
-            proj2_norm = np.zeros(len(diff), dtype=float)
-            
-        total2_norm = np.sum(diff**2, axis=1)
-
-        res2_norm = np.maximum(total2_norm - proj2_norm, 0.0)
-        res_d2 = res2_norm / self.reg
-
-        return obs_d2 + res_d2
-
     def _fit_threshold(
         self,
         diff: np.ndarray,
@@ -147,8 +125,8 @@ class EllipsoidFitter:
         if len(diff) == 0:
             return 0.0
 
-        d2 = self._distance_squared(
-            diff, eigvecs, eigvals
+        d2 = distance_squared(
+            diff, eigvecs, eigvals, self.reg
         )
 
         return float((d2 * weights).max())
@@ -189,8 +167,8 @@ class EllipsoidFitter:
         """Return a mask indicating which points lie inside an ellipsoid."""
         diff = X - ellipsoid.center
 
-        d2 = self._distance_squared(
-            diff, ellipsoid.eigvecs, ellipsoid.eigvals
+        d2 = distance_squared(
+            diff, ellipsoid.eigvecs, ellipsoid.eigvals, self.reg
         )
 
         return d2 <= ellipsoid.threshold 
@@ -206,10 +184,11 @@ class EllipsoidFitter:
         diff = X - ellipsoid.center
 
         if ellipsoid.eigvals.size == 0:
-            d2 = self._distance_squared(
+            d2 = distance_squared(
                 diff,
                 ellipsoid.eigvecs,
-                ellipsoid.eigvals
+                ellipsoid.eigvals,
+                self.reg
             )
             return d2 <= ellipsoid.threshold
         
@@ -218,8 +197,8 @@ class EllipsoidFitter:
 
         grown_eigvals = ellipsoid.eigvals * (axis_growth ** 2)
 
-        d2 = self._distance_squared(
-            diff, ellipsoid.eigvecs, grown_eigvals
+        d2 = distance_squared(
+            diff, ellipsoid.eigvecs, grown_eigvals, self.reg
         )
 
         return d2 <= ellipsoid.threshold

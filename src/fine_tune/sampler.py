@@ -1,12 +1,14 @@
 import random
 import math
+import numpy as np
 
 from collections import defaultdict
+from collections.abc import Sequence
 from typing import Iterator
 
 from torch.utils.data import Sampler
 
-class BatchSampler(Sampler[list[int]]):
+class BatchSampler(Sampler[Sequence[int]]):
     """Generate balanced training batches across categories.
 
     Each batch contains 'samples_per_cat' samples from every category. Samples
@@ -15,7 +17,7 @@ class BatchSampler(Sampler[list[int]]):
     """
 
     def __init__(self, 
-            labels: list[int], 
+            labels: np.ndarray, 
             samples_per_cat: int, 
             seed: int  | None = None
         ):

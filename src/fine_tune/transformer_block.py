@@ -50,11 +50,16 @@ class DinoBlockExtension(nn.Module):
     def __init__(
             self,
             dino: DinoModel,
+            use_outer_residual: bool = False,
+
+            dropout: float = 0.0
     ) -> None:
         super().__init__()
 
         self.dino = dino
-        self.adapter = AnomalyDinoBlock() # FIXME: Initialize with appropriate parameters so its configureable
+        self.residual = use_outer_residual
+
+        self.adapter = AnomalyDinoBlock(drop=dropout) # FIXME: Initialize with appropriate parameters so its configureable
         self.norm = nn.LayerNorm(384, eps=1e-6) # FIXME: Use those initalised paramter for the correct dimension even though it will more than likely stay as 384
 
     def train(self, mode: bool = True)-> "DinoBlockExtension":
@@ -72,4 +77,9 @@ class DinoBlockExtension(nn.Module):
         adapted_tokens = self.adapter(tokens)
         adapted_tokens = self.norm(adapted_tokens)
 
-        return adapted_tokens[:, 0] # Return the CLS token
+        dino_cls = tokens[:, 0]
+        cls = adapted_tokens[:, 0]
+
+        if self.residual:
+            return dino_cls + cls
+        return cls 

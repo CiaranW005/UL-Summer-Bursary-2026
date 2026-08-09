@@ -6,11 +6,14 @@ from sklearn.metrics import roc_auc_score, roc_curve
 
 from collections.abc import Sequence
 
-from ..types import Ellipsoid, EllipsoidOverlapResult, BucketAUROC, EllipsoidCollection
+from .distance import distance_squared
+from ..types import Ellipsoid, EllipsoidOverlapResult, BucketAUROC, EllipsoidCollection, EllipsoidEvaluation, EvaluationMetrics
 
 class EllipsoidEvaluator:
-    @staticmethod
-    def overlap(embeds: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[pd.DataFrame, int]:
+    def __init__(self, reg: float = 1e-4) -> None:
+        self.reg = reg
+
+    def overlap(self, embeds: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[pd.DataFrame, int]:
         """Measure overlap between every pair of fitted ellipsoids
         
         Overlap is defined as either ellipsoid containing one or more points 
@@ -24,31 +27,38 @@ class EllipsoidEvaluator:
 
             # Points owned by j inside ellipsoid i
             diff = embeds[e2.covered_idx] - e1.center
-            proj = diff @ e1.eigvecs
-            d2 = np.sum((proj ** 2) / e1.eigvals, axis=1)
+            d2 = distance_squared(
+                diff, 
+                eigvecs=e1.eigvecs,
+                eigvals=e1.eigvals,
+                reg=self.reg
+            )
             j_inside_i = np.sum(d2 <= e1.threshold)
 
             # Points owned by i inside ellipsoid j
             diff = embeds[e1.covered_idx] - e2.center
-            proj = diff @ e2.eigvecs
-            d2 = np.sum((proj ** 2) / e2.eigvals, axis=1)
+            d2 = distance_squared(
+                diff,
+                eigvecs=e2.eigvecs,
+                eigvals=e2.eigvals,
+                reg=self.reg
+            )
             i_inside_j = np.sum(d2 <= e2.threshold)
 
-            overlaps.append({
-                "ellipsoid_i": i,
-                "ellipsoid_j": j,
-                "j_points_inside_i": j_inside_i,
-                "i_points_inside_j": i_inside_j,
-                "overlap": (j_inside_i + i_inside_j) > 0
-            })
+            overlaps.append(EllipsoidOverlapResult(
+                ellipsoid_i=i,
+                ellipsoid_j=j,
+                j_points_inside_i=int(j_inside_i),
+                i_points_inside_j=int(i_inside_j),
+                overlap=bool((j_inside_i + i_inside_j) > 0)
+            ))
 
         overlap_df = pd.DataFrame(overlaps)
         num_overlaps = overlap_df["overlap"].sum()
 
         return overlap_df, num_overlaps
 
-    @staticmethod
-    def inside_any_count(X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, np.ndarray]:
+    def inside_any_count(self, X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, np.ndarray]:
         """Determine which samples lie inside at least one ellipsoid.
 
         Returns both a boolean mask indicating whether each sample is covered
@@ -59,8 +69,9 @@ class EllipsoidEvaluator:
 
         for e in ellipsoids:
             diff = X - e.center
-            proj = diff @ e.eigvecs
-            d2 = np.sum((proj ** 2) / e.eigvals, axis=1)
+            d2 = distance_squared(
+                diff, e.eigvecs, e.eigvals, reg=self.reg
+            )
 
             inside = d2 <= e.threshold
 
@@ -69,8 +80,7 @@ class EllipsoidEvaluator:
 
         return inside_any, inside_count
     
-    @staticmethod
-    def score_samples(X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, int]:
+    def score_samples(self, X: np.ndarray, ellipsoids: Sequence[Ellipsoid]) -> tuple[np.ndarray, int]:
         """Score samples using their nearest ellipsoid boundary.
 
         Lower scores indicate samples further inside an ellipsoid, while
@@ -82,8 +92,9 @@ class EllipsoidEvaluator:
 
         for i, e in enumerate(ellipsoids):
             diff = X - e.center
-            proj = diff @ e.eigvecs
-            d2 = np.sum((proj ** 2) / e.eigvals, axis=1)
+            d2 = distance_squared(
+                diff, e.eigvecs, e.eigvals, reg=self.reg
+            )
             margins[:, i] = d2 - e.threshold
 
         best_ellipsoid = margins.argmin(axis=1)
@@ -91,11 +102,12 @@ class EllipsoidEvaluator:
 
         return scores, best_ellipsoid
     
-    def evaluate_detection(self, 
+    def evaluate_detection(
+                    self, 
                     good_test_emb: np.ndarray, 
                     defect_test_emb: np.ndarray, 
                     collection: EllipsoidCollection
-                )-> tuple[pd.DataFrame, dict[str, float]]:
+                )-> EllipsoidEvaluation:
         """Evaluate anomaly detection performance on the test set.
 
         Scores are converted into binary predictions using the Youden-optimal
@@ -122,8 +134,9 @@ class EllipsoidEvaluator:
         eig_ratios = np.array([e.raw_eig_ratio for e in collection.stats])
 
         # Record properties of the ellipsoid producing the best score.
-        results_df = pd.DataFrame({
+        samples = pd.DataFrame({
             "y_true": y_true,
+            "predicted_label" : predicted_label,
             "score": scores,
             "correct": correct,
             "winning_ellipsoid": best_ellipsoid,
@@ -131,12 +144,16 @@ class EllipsoidEvaluator:
             "winning_eigval_ratio": eig_ratios[best_ellipsoid],
         })
 
-        metrics: dict[str, float] = {
-            "auroc": auroc,
-            "best_threshold": best_threshold,
-        }
+        metrics = EvaluationMetrics(
+            samples=samples,
+            auroc=auroc,
+            threshold=best_threshold
+        )
 
-        return results_df, metrics
+        return EllipsoidEvaluation(
+            samples=samples,
+            metrics=metrics
+        )
     
     @staticmethod
     def bucket_diagnostics(results_df: pd.DataFrame)-> dict[str, pd.DataFrame]:

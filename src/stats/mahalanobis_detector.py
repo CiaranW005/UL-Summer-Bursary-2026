@@ -4,14 +4,13 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 class MahalanobisDetector:
-    def __init__(self, reg: float =1e-6):
+    def __init__(self, reg: float = 1e-6):
         self.reg = reg
 
         self._centroid: np.ndarray | None = None
 
         self._eigvals: np.ndarray | None = None
         self._eigvecs: np.ndarray | None = None
-
 
     def fit(self, embeds: np.ndarray) -> None:
         if len(embeds) < 2:

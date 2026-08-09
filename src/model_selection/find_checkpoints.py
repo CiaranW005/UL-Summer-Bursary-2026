@@ -3,9 +3,10 @@ from pathlib import Path
 
 def get_checkpoints(directory: Path) -> list[Path]:
     if not directory.exists():
+        print(f"Found 0 {directory} checkpoints")
         return []
 
-    return sorted(
+    paths = sorted(
         (
             path
             for path in directory.iterdir()
@@ -15,6 +16,8 @@ def get_checkpoints(directory: Path) -> list[Path]:
         reverse=True,
     )
 
+    print(f"Found {len(paths)} checkpoints at {directory}")
+    return paths
 
 def get_latest_checkpoint(directory: Path) -> Path:
     checkpoints = get_checkpoints(directory)
