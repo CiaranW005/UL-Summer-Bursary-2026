@@ -1,10 +1,14 @@
 import os
 import pandas as pd
 
-from ..config import ROOT, DATA_DIR, DATASET_DIR, CSV_PATH
+from ..config.paths import ROOT, DATA_DIR, DATASET_DIR, CSV_PATH
+from .types import ImageRecord
 
-def create_metadata():
-    images = []
+def create_metadata() -> None:
+    """
+    
+    """
+    images: list[ImageRecord] = []
 
     # Go through each category in the dataset
     for cat in DATASET_DIR.iterdir():
@@ -25,18 +29,18 @@ def create_metadata():
             #print(f"    {split.name}")
 
             # Within each split, go through each type (good/defect)
-            for type in split.iterdir():    
+            for defect_type in split.iterdir():    
                 #print(f"        {type.name}")
 
-                for img in type.iterdir():
+                for img in defect_type.iterdir():
                     #print(f"            {img.name}")
 
-                    image_record = {
+                    image_record : ImageRecord = {
                         "path": str(img.relative_to(ROOT)),
                         "category": cat.name,
                         "split": split.name,
-                        "type": type.name,
-                        "label": 0 if type.name == "good" else 1
+                        "type": defect_type.name,
+                        "label": 0 if defect_type.name == "good" else 1
                     }
 
                     images.append(image_record)

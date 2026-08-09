@@ -2,10 +2,14 @@ import sqlite3
 import pandas as pd
 
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
 
-from ..config import DB_PATH
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms 
+
+from collections.abc import Callable
+
+from ..config.paths import DB_PATH
 
 img_transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -16,27 +20,35 @@ img_transform = transforms.Compose([
     )
 ])
 
-class ModelData(Dataset):
-    def __init__(self, paths, transform=None):
+class ModelData(Dataset[torch.Tensor]):
+    """
+    Dataset that loads images from disk and applies preprocessing transforms.
+    """
+
+    def __init__(self, paths : list[str], transform : Callable[[Image.Image], torch.Tensor]):
         self.paths = paths
         self.transform = transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.paths)
     
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) ->  torch.Tensor:
         path = self.paths[index]
         img = Image.open(path).convert("RGB")
 
-        if self.transform:
-            img = self.transform(img)
+        img = self.transform(img)
         
-        return img, index
+        return img
 
-def preprocess():
+def preprocess() -> DataLoader[torch.Tensor]:
+    """
+    Load all image paths from the metadata database and return a DataLoader
+    for embedding extraction.
+    """
+
     conn = sqlite3.connect(DB_PATH)
 
-    paths = pd.read_sql_query(
+    paths = pd.read_sql_query(  # pyright: ignore[reportUnknownMemberType]
         """
         SELECT path
         FROM meta
@@ -61,7 +73,7 @@ def preprocess():
 if __name__ == "__main__":
     loader = preprocess()
 
-    for images, indices in loader:
+    for images in loader:
         print(images.shape)
-        print(indices[:5])
         break
+    

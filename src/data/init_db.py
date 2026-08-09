@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from ..config import DB_PATH, SQL_DIR, CSV_PATH
+from ..config.paths import DB_PATH, SQL_DIR, CSV_PATH
 
 def build_metadata_db():
     SQL_DIR.mkdir(parents=True, exist_ok=True)
@@ -33,3 +33,4 @@ def build_metadata_db():
 
 if __name__ == "__main__":
     build_metadata_db()
+    
