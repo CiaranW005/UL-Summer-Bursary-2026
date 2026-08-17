@@ -19,7 +19,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from typing import TYPE_CHECKING
 
@@ -33,6 +33,8 @@ from ..model_selection.types import EmbeddingPipeline
 
 if TYPE_CHECKING:
     import torch.nn as nn
+
+    from bidict import bidict
 
     from .logger import TrainLogger
     from .types import Sample, TrainingObjects, ModelInfo
@@ -48,18 +50,7 @@ def in_notebook() -> bool:
         )
     except (ImportError, NameError):
         return False
-    
-def run_pipeline(
-        views: torch.Tensor, 
-        pipeline: EmbeddingPipeline
-    ) -> torch.Tensor:
-    """Pass views sequentially through a list of models."""
 
-    x = views
-    for stage in pipeline:
-        x = stage.model(x)
-
-    return x
 
 def forward_model(
     x: torch.Tensor,
@@ -67,7 +58,7 @@ def forward_model(
     model: nn.Module,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
-        embeds = run_pipeline(x, pipeline)
+        embeds = pipeline(x)
 
     if isinstance(model, DinoBlockExtension):
         z = model(x)
@@ -305,13 +296,14 @@ class Trainer:
     @torch.inference_mode()
     def test(
         self,
-        train_loader: DataLoader,
+        mahalanobis_loader: DataLoader,
         test_loader: DataLoader,
-        types_to_id: dict[str, int]
+        types_to_id: bidict[str, int],
+        cat_to_id: bidict[str, int]
     ) -> pd.Series:
         metrics: dict[str, float] = {}
 
-        train_embeds, train_categories, _ = self.embed_loader(train_loader)
+        mal_embeds, mal_categories, _ = self.embed_loader(mahalanobis_loader)
         test_embeds, categories, types = self.embed_loader(test_loader)
 
         fitter = MahalanobisDetector(reg=1e-6)
@@ -323,12 +315,16 @@ class Trainer:
             for key, value in category_metrics.items()
         })
 
+        aurocs: list[float] = []
+        type_metric_values: dict[str, list[float]] = {}
+        normal_defect_metric_values: dict[str, list[float]] = {}
+
         unique_cat = np.unique(categories)
         for cat in unique_cat:
-            train_cat_mask = train_categories == cat
+            mal_cat_mask = mal_categories == cat
             test_cat_mask = categories == cat
 
-            train_cat_embeds = train_embeds[train_cat_mask]
+            mal_cat_embeds = mal_embeds[mal_cat_mask]
             test_cat_embeds = test_embeds[test_cat_mask]
 
             cat_types = types[test_cat_mask]
@@ -336,10 +332,9 @@ class Trainer:
             # Individual defect type geometry
             type_metrics = cluster_metrics(test_cat_embeds, cat_types)
 
-            metrics.update({
-                f"test/{cat}/type/{key}": value
-                for key, value in type_metrics.items()
-            })
+            for key, value in type_metrics.items():
+                metrics.update({f"test/{cat_to_id.inverse[cat]}/type/{key}": value})
+                type_metric_values.setdefault(key, []).append(value)
 
             # Normal vs defect geometry
             binary_labels = (
@@ -348,20 +343,32 @@ class Trainer:
 
             normal_defect_metrics = cluster_metrics(test_cat_embeds, binary_labels)
 
-            metrics.update({
-                f"test/{cat}/normal_defect/{key}": value
-                for key, value in normal_defect_metrics.items()
-            })
+            for key, value in normal_defect_metrics.items():
+                metrics.update({f"test/{cat_to_id.inverse[cat]}/normal_defect/{key}": value})
+                normal_defect_metric_values.setdefault(key, []).append(value)
 
             # OOD detection
-            fitter.fit(train_cat_embeds)
+            fitter.fit(mal_cat_embeds)
 
             auc = fitter.evaluate_detection(
                 good_embeds=test_cat_embeds[binary_labels == 0],
                 defect_embeds=test_cat_embeds[binary_labels == 1]
             )
 
-            metrics[f"test/{cat}/auroc"] = auc
+            metrics[f"test/{cat_to_id.inverse[cat]}/auroc"] = auc
+            aurocs.append(auc)
+
+        metrics["test/mean_auroc"] = float(np.mean(aurocs))
+
+        metrics.update({
+            f"test/mean/type/{key}": float(np.mean(values))
+            for key, values in type_metric_values.items()
+        })
+
+        metrics.update({
+            f"test/mean/normal_defect/{key}": float(np.mean(values))
+            for key, values in normal_defect_metric_values.items()
+        })
 
         if self.logger:
             self.logger.log(metrics)
@@ -383,6 +390,7 @@ class Trainer:
         best_val = float("inf")
         best_epoch = None
         best_state = None
+        best_metrics_collected = False
 
         val_window = deque(maxlen=5)
 
@@ -410,6 +418,7 @@ class Trainer:
                     best_epoch = epoch + 1
 
                     best_state = deepcopy(self.objs.model.state_dict())
+                    best_metrics_collected = collect_val_metrics
 
                 history.loc[len(history)] = {
                     "epoch": epoch+1,
@@ -444,9 +453,14 @@ class Trainer:
                     relative_slope = abs(slope) / abs(window.mean() + 1e-8)
 
                     if relative_slope < 1e-3:
-                        _ = self.evaluate(val_loader, log_metrics=not collect_val_metrics)
                         break
-                
+
+            if best_state is None or best_epoch is None:
+                raise RuntimeError("Training completed without a valid validation result")
+
+            self.objs.model.load_state_dict(best_state)
+            _ = self.evaluate(val_loader, log_metrics=not best_metrics_collected)
+
         except Exception as e:
                 return TrainingResults(
                     history=history,

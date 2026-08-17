@@ -40,7 +40,7 @@ class MahalanobisDetector:
 
         proj = diff @ self._eigvecs
 
-        obs_d2 = np.sum((proj**2) / self._eigvals + self.reg, axis=1)
+        obs_d2 = np.sum((proj**2) / (self._eigvals + self.reg), axis=1)
 
         total2_norm = np.sum(diff**2, axis=1)
         proj2_norm = np.sum(proj**2, axis=1)

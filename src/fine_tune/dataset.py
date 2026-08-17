@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+from bidict import bidict
 from collections.abc import Callable, Sequence
 
 from .utils import get_category, get_type
@@ -14,9 +15,9 @@ class ModelData(Dataset[Sample]):
     def __init__(self, 
             paths: Sequence[str], 
             root: Path, 
-            category_to_id: dict[str, int], 
+            category_to_id: bidict[str, int], 
             transform: Callable[[Image.Image], torch.Tensor], 
-            types_to_id: dict[str, int] | None = None):
+            types_to_id: bidict[str, int] | None = None):
         self.paths = paths
         self.root = root 
 

@@ -16,9 +16,11 @@ def create_pipeline(model_dir: Path) -> EmbeddingPipeline:
         meta = json.load(f)
 
     parent_models = cast(dict[str, str], meta["parent_models"])
+    model_type = meta.get("model_type")
 
     stages: list[PipelineStage] = []
     for name, path in parent_models.items():
+        model_path = None
         if path in ("None", None):
             embed_path = EMBEDS_DIR / "dino/pretrained"
         else:
@@ -31,8 +33,9 @@ def create_pipeline(model_dir: Path) -> EmbeddingPipeline:
             else:
                 parent_name = path.parent.parent.name
             embed_path = EMBEDS_DIR / parent_name / path.parent.name
-
-        stages.append(PipelineStage(name=name, path=embed_path))
+            model_path = path.parent
+        
+        stages.append(PipelineStage(name=name, model_path=model_path, embed_path=embed_path))
 
     if (
         "dino_adapter_block" in model_dir.parts
@@ -42,8 +45,9 @@ def create_pipeline(model_dir: Path) -> EmbeddingPipeline:
     else:
         parent_name = model_dir.parent.name
     stages.append(PipelineStage(
-        name="chosen model",
-        path=EMBEDS_DIR / parent_name / model_dir.name
+        name=model_type or "chosen_model",
+        model_path=model_dir,
+        embed_path=EMBEDS_DIR / parent_name / model_dir.name
     ))
     return EmbeddingPipeline(stages=stages)
 
