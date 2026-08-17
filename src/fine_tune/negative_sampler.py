@@ -2,8 +2,9 @@ import random
 import numpy as np
 
 import logging
+
+from bidict import bidict
 from collections import defaultdict
-from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 class NegativeSampler:
@@ -18,7 +19,7 @@ class NegativeSampler:
     def __init__(self, 
             labels : np.ndarray, 
             samples_per_cat: int, 
-            types_to_id: dict[str, int], 
+            types_to_id: bidict[str, int], 
             seed: int | None = None
         ):
         self.samples_per_cat = samples_per_cat

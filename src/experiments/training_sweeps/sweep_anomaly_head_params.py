@@ -12,15 +12,21 @@ from .run_experiment import run_experiment
 
 from ...fine_tune.types import ModelParameters, ModelInfo
 
-from ...config.loss_config import ANOMALY_LOSS_CONFIGS
-from ...config.model_configs import MLPConfig
+from ...config.loss_config import AnomalyLossConfig
+from ...config.model_configs import MLP_CONFIGS
 from ...config.paths import RESULTS
 
 def main(pipeline_path: Path | None):
-    model_configs = MLPConfig()
+    loss_config = AnomalyLossConfig(anomaly_weight=1.0, vicreg_weight=0)
     git_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 
-    PARAMS: ModelParameters = {
+    NOTES = [
+        "Trained on normal dino"
+    ]
+
+    results: list[pd.Series] = []
+    for model_configs in MLP_CONFIGS:
+        PARAMS: ModelParameters = {
         "seed": 42,
         "num_workers": 4,
         "pin_memory": torch.cuda.is_available(),
@@ -38,14 +44,8 @@ def main(pipeline_path: Path | None):
         
         "model_normaliser": "layer",
         "model_name": "model.pt",
-    }
+        }
 
-    NOTES = [
-        "Trained on normal dino"
-    ]
-
-    results: list[pd.Series] = []
-    for loss_config in ANOMALY_LOSS_CONFIGS:
         losses = build_anomaly_losses(loss_config)
 
         MODEL_INFO: ModelInfo = {
@@ -64,7 +64,7 @@ def main(pipeline_path: Path | None):
         )
         results.append(metrics)
     
-    output_path = RESULTS / "anomaly_head" / "stage1_sweep.csv"
+    output_path = RESULTS / "anomaly_head" / "stage1_param_sweep.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     pd.DataFrame(results).to_csv(output_path, index=False)

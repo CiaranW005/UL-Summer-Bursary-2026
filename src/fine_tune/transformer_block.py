@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from functools import partial
 
 import torch
 import torch.nn as nn
 
+from typing import TYPE_CHECKING
 from .models.dino import Block, Attention, Mlp
 
-from ..model_selection.types import DinoModel
+if TYPE_CHECKING:
+    from ..model_selection.types import DinoModel
 
 class AnomalyDinoBlock(nn.Module):
     """

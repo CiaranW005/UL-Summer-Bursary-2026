@@ -21,4 +21,16 @@ class AdapterConfig:
     dropout: float = 0.1
 
     hidden_dims: int = 1536
-    residual: bool = False
+    residual: bool = True
+
+MLP_CONFIGS = [
+    MLPConfig(learning_rate=lr, dropout=dropout)
+    for lr in [1e-5, 1e-4, 1e-3]
+    for dropout in [0.0, 0.1, 0.2]
+]
+
+ADAPTER_CONFIGS = [
+    AdapterConfig(learning_rate=lr, dropout=dropout)
+    for lr in [1e-6, 1e-5, 1e-4]
+    for dropout in [0.0, 0.1, 0.2]
+]
