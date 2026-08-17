@@ -10,6 +10,7 @@ class ImageRecord(TypedDict):
     split: str
     type: str
     label: int
+    defect_coverage: float
 
 @dataclass
 class Embeddings:

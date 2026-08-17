@@ -4,7 +4,7 @@ import torch.nn as nn
 from dataclasses import dataclass
 from pathlib import Path
 
-from typing import cast
+from typing import Any, cast
 
 from ..data.types import DinoModel
 
@@ -17,6 +17,7 @@ class PipelineStage:
 @dataclass
 class EmbeddingPipeline:
     stages: list[PipelineStage]
+    inference_model: nn.Module | None = None
 
     def __post_init__(self) -> None:
         if self.stages and self.stages[0].name != "dino":
@@ -31,6 +32,14 @@ class EmbeddingPipeline:
     def __getitem__(self, idx: int) -> PipelineStage:
         return self.stages[idx]
 
+    def __call__(self, x: torch.Tensor) -> Any:
+        if self.inference_model is not None:
+            return self.inference_model(x)
+
+        for stage in self.stages:
+            x = stage.model(x)
+        return x
+
     def get(self, name: str) -> PipelineStage | None:
         return next((stage for stage in self.stages if stage.name == name), None)
 
@@ -42,6 +51,12 @@ class EmbeddingPipeline:
     def eval(self) -> "EmbeddingPipeline":
         for stage in self.stages:
             stage.model.eval()
+        return self
+
+    def compile(self) -> "EmbeddingPipeline":
+        self.inference_model = cast(nn.Module, (torch.compile(
+            nn.Sequential(*(stage.model for stage in self.stages))
+        )))
         return self
     
     @property

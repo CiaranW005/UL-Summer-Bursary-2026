@@ -4,7 +4,7 @@ import numpy as np
 
 from tqdm.auto import tqdm 
 
-from sklearn.metrics import roc_auc_score
+from src.stats.mahalanobis_detector import MahalanobisDetector
 
 def evaluate_embedding(embeds: np.ndarray, meta: pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame(columns=["category", "auroc"])
@@ -15,26 +15,20 @@ def evaluate_embedding(embeds: np.ndarray, meta: pd.DataFrame) -> pd.DataFrame:
         test_cls = embeds[(meta["category"] == category) & (meta["split"] == "test")]
         test_labels = meta[(meta["category"] == category) & (meta["split"] == "test")]["label"]
 
-        centroid = train_cls.mean(axis=0)
-        diff = test_cls - centroid
+        good_embeds = test_cls[test_labels == 0]
+        defect_emebds = test_cls[test_labels == 1]
 
-        cov = np.cov(train_cls.T)
-        cov += np.eye(cov.shape[0]) * 1e-6
-        cov_inv = np.linalg.pinv(cov)
+        fitter = MahalanobisDetector(reg=1e-6)
+        fitter.fit(train_cls)
 
-        mal_scores = np.sqrt(
-            np.einsum(
-                "ij, jk, ik->i",
-                diff,
-                cov_inv,
-                diff
-            )
+        auroc = fitter.evaluate_detection(
+            good_embeds=good_embeds,
+            defect_embeds=defect_emebds
         )
 
-        auc = roc_auc_score(test_labels, mal_scores)
         df.loc[len(df)] = {
             "category": category,
-            "auroc": auc
+            "auroc": auroc,
         }
 
     return df

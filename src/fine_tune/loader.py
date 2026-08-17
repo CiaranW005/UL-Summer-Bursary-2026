@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, Dataset, Subset, random_split
 
 from PIL import Image
 
+from bidict import bidict
 from pathlib import Path
 from collections.abc import Sequence, Callable
 
@@ -12,8 +13,6 @@ from .dataset import ModelData
 from .sampler import BatchSampler
 from .negative_sampler import NegativeSampler
 from .types import ModelParameters
-
-from ..model_selection.types import EmbeddingPipeline
 
 class DataLoading:
     def __init__(
@@ -26,39 +25,50 @@ class DataLoading:
         self.root = root
         self.params = params
 
-        self.cat_to_id = {c: idx for idx, c in enumerate(categories)}
-        self.types_to_id = {t: idx for idx, t in enumerate(types)}
+        self.cat_to_id = bidict({c: idx for idx, c in enumerate(categories)})
+        self.types_to_id = bidict({t: idx for idx, t in enumerate(types)})
 
     def create_train_val_loaders(
             self,
-            train_paths: Sequence[str],
-            transform: Callable[[Image.Image], torch.Tensor],
+            paths: Sequence[str],
+            train_transform: Callable[[Image.Image], torch.Tensor],
+            eval_transform: Callable[[Image.Image], torch.Tensor],
             train_ratio: float = 0.95
-        ) -> tuple[DataLoader, DataLoader]:
+        ) -> tuple[DataLoader, DataLoader, DataLoader]:
+        n = len(paths)
+        train_size = int(n * train_ratio)
 
-        dataset = ModelData(
+        generator = torch.Generator().manual_seed(self.params["seed"])
+        indices: list[int] = torch.randperm(n, generator=generator).tolist()
+
+        train_indices = indices[:train_size]
+        eval_indices = indices[train_size:]
+
+        train_paths = [paths[i] for i in train_indices]
+
+        mahalanobis_dataset = ModelData(
+            paths=paths,
+            root=self.root,
+            category_to_id=self.cat_to_id,
+            types_to_id=None,
+            transform=eval_transform
+        )        
+
+        train_dataset = ModelData(
             paths=train_paths,
             root=self.root,
             category_to_id=self.cat_to_id,
             types_to_id=None,
-            transform=transform
+            transform=train_transform
         )
 
-        train_split = int(len(dataset) * train_ratio)
-        val_split = len(dataset) - train_split
+        val_set = Subset(mahalanobis_dataset, eval_indices)
 
-        generator = torch.Generator().manual_seed(self.params["seed"])
-        train_set, val_set = random_split(
-            dataset,
-            [train_split, val_split],
-            generator=generator
-        )
-
-        train_labels = dataset.category_ids[train_set.indices]
-        val_labels = dataset.category_ids[val_set.indices]
+        train_labels = train_dataset.category_ids
+        val_labels = mahalanobis_dataset.category_ids[eval_indices]
 
         train_loader = DataLoader(
-            train_set,
+            train_dataset,
             batch_sampler=BatchSampler(
                 labels=train_labels,
                 samples_per_cat=self.params["samples_per_category"],
@@ -80,7 +90,15 @@ class DataLoading:
             pin_memory=self.params["pin_memory"]
         )
 
-        return train_loader, val_loader
+        mahalanobis_loader = DataLoader(
+            mahalanobis_dataset,
+            batch_size=self.params["batch_size"],
+            shuffle=False,
+            num_workers=self.params["num_workers"],
+            pin_memory=self.params["pin_memory"]
+        )
+
+        return train_loader, val_loader, mahalanobis_loader
 
     def create_test_dataset(
             self, 

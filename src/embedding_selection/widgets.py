@@ -47,11 +47,8 @@ class ModelSelector:
             )
         
         elif filter == "Anomaly Detection Models":
-            paths = (
-                self.anomaly_block +
-                self.anomaly_head
-            )
-
+            paths = self.anomaly_head
+            
         elif filter == "Category Head Models":
             paths = self.category_head
 

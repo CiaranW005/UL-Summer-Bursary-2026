@@ -47,16 +47,16 @@ def main(pipeline_path: Path | None = None):
     results: list[pd.Series] = []
     for loss_config in UNSUPERVISED_LOSS_CONFIGS:
         loss_config.preservation_weight = 0
-        
+
+        losses = build_unsupervised_losses(loss_config)
         MODEL_INFO: ModelInfo = {
+            "losses": losses.to_dict(),
             "model_type": "dino_fine_tune",
             "notes" : NOTES,
             "git_commit" : git_commit,
             "parameters" : PARAMS,
             "parent_models": {}
         }
-
-        losses = build_unsupervised_losses(loss_config)
 
         metrics = run_experiment(
             params=PARAMS,

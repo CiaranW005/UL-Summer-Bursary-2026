@@ -76,9 +76,14 @@ def load_projection_head(
         norm_type=parameters["model_normaliser"],
     )
 
-    model.load_state_dict(
-        checkpoint["model_state_dict"]
-    )
+    state_dict = checkpoint["model_state_dict"]
+    if any(key.startswith("_orig_mod.") for key in state_dict):
+        state_dict = {
+            key.removeprefix("_orig_mod."): value
+            for key, value in state_dict.items()
+        }
+
+    model.load_state_dict(state_dict)
 
     model.to(device)
     model.eval()
@@ -139,11 +144,11 @@ def load_inference_models(
             )]
         )
 
-    is_category_head = "category_head" in model_path.parts
+    is_unsupervised_head = "unsupervised_head" in model_path.parts
     is_anomaly_head = "anomaly_head" in model_path.parts
     is_dino_adapter_block = "dino_adapter_block" in model_path.parts
 
-    if not is_category_head and not is_anomaly_head and not is_dino_adapter_block:
+    if not is_unsupervised_head and not is_anomaly_head and not is_dino_adapter_block:
         raise ValueError(
             f"Unknown model checkpoint location: {model_path}"
         )
@@ -175,14 +180,14 @@ def load_inference_models(
     )
 
     if is_anomaly_head:
-        category_head_path = parent_models.get("category_head")
+        unsuperived_head_path = parent_models.get("unsupervised_head")
 
         # When the anomaly head is trained using fine tuned dino
-        if category_head_path is not None:
-            category_head_path = Path(category_head_path)
+        if unsuperived_head_path is not None:
+            category_head_path = Path(unsuperived_head_path)
 
             pipeline.stages.append(PipelineStage(
-                name="category_head",
+                name="unsupervised_head",
                 model=load_projection_head(
                     checkpoint_path=category_head_path,
                     checkpoint=None,
@@ -192,7 +197,7 @@ def load_inference_models(
             ))
 
     pipeline.stages.append(PipelineStage(
-        name= "category_head" if is_category_head else "anomaly_head",
+        name= "unsupervised_head" if is_unsupervised_head else "anomaly_head",
         model=load_projection_head(
             checkpoint_path=model_path,
             checkpoint=checkpoint,

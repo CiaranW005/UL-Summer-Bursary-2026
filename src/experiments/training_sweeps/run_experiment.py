@@ -22,10 +22,11 @@ from ...fine_tune import (
 )
 from ...fine_tune.model import ProjectionHead
 from ...fine_tune.transformer_block import DinoBlockExtension
-from ...fine_tune.train import run_pipeline
 
 from ...fine_tune.losses.combined_loss import CombinedLoss 
 from ...fine_tune.losses.types import LossCollection
+
+torch.set_float32_matmul_precision("high")
 
 def run_experiment(
         params: ModelParameters,
@@ -57,9 +58,10 @@ def run_experiment(
 
     loader = DataLoading(root=ROOT, params=params, categories=categories, types=types)
 
-    train_loader, val_loader = loader.create_train_val_loaders(
+    train_loader, val_loader, mahalanobis_loader = loader.create_train_val_loaders(
         train_paths,
-        transform=contrastive_transform,
+        train_transform=contrastive_transform,
+        eval_transform=test_transform,
         train_ratio=0.95
     )
 
@@ -114,13 +116,14 @@ def run_experiment(
         ).to(device)
 
         if neg_images is not None:
-            neg_embeds = run_pipeline(neg_images, pipeline)
+            neg_embeds = pipeline(neg_images)
             
     model_info["parent_models"] = {
         stage.name: str(stage.path) if stage.path is not None else None
         for stage in pipeline
     }   
 
+    model.compile()
     optimizer = AdamW((p for p in model.parameters() if p.requires_grad), 
                       lr=params["learning_rate"], 
                       weight_decay=params["weight_decay"]
@@ -141,6 +144,7 @@ def run_experiment(
         negative_labels=neg_labels
     )
 
+    pipeline.compile()
     trainer = Trainer(objs=training_objs, pipeline=pipeline, logger=logger)
 
     try:
@@ -161,10 +165,10 @@ def run_experiment(
             raise results.error
 
         test_metrics = trainer.test(
-            train_loader=train_loader,
+            mahalanobis_loader=mahalanobis_loader,
             test_loader=test_loader,
-            types_to_id=loader.types_to_id
-
+            types_to_id=loader.types_to_id,
+            cat_to_id=loader.cat_to_id
         )
     finally:
         if trainer.logger is not None:

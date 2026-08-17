@@ -24,6 +24,7 @@ def build_metadata_db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_category ON meta(category)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_split ON meta(split)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_label ON meta(label)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_defect_coverage ON meta(defect_coverage)")
 
     conn.commit()
     conn.close()
