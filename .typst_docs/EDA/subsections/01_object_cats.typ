@@ -1,5 +1,6 @@
-= Identify the object and texture categories present within the dataset.
+=  Object and Texture Categories
 
+All 15 available categories that are present within the MVTec dataset.
 #align(center,
   table(
     columns: 5,

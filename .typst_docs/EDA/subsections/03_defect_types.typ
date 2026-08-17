@@ -1,6 +1,6 @@
-= Investigate the defect types available within each category.
+= Defect Types by Category
 
-Understanding the variety of defect types present within each category is for assessing dataset complexity. Categories containing a larger number of defect types may present a more challenging anomaly detection task.
+Understanding the variety of defect types present within each category is important for assessing dataset complexity. Categories containing a larger number of defect types may present a more challenging anomaly detection task.
 
 The following visualisations show how defect types are distributed within each category's test set. This provides insight into the relative frequency of different anomaly types.
 
@@ -13,7 +13,7 @@ The following visualisations show how defect types are distributed within each c
 
 The number and distribution of defect types varies substantially between categories. Some categories contain only a small number of anomaly classes, while others contain a wider range of defect variations.
 
-This analysis examines the number of unique defect types present within each category. A larger number of defect types may indicate increased anomaly diversity and greater detection complexity.
+Examples of normal and defective samples are shown below to illustrate the visual variation between anomaly types. A larger number of certain defect types may indicate increased anomaly diversity and greater detection complexity.
 
 #align(center)[
     #figure(

@@ -1,12 +1,12 @@
-= Examine the distribution of normal and anomalous samples.
+= Normal and Anomalous Sample Distribution
 
-This section examines how samples are distributed across the dataset. Understanding the balance between normal and anomalous images helps inform about any class imbalances may influence anomaly detection performance and evaluation metrics.
+This section examines how samples are distributed across the dataset. Understanding the balance between normal and anomalous images helps identify class imbalances that may influence anomaly detection performance and evaluation metrics.
 
 #v(1cm)
 #align(center)[
     #figure(
         image("../../../images/EDA/class_distribution_pie.svg", width: 105%),
-        caption: ("")
+        caption: ("Overall normal/defective and train/test distribution of MVTec AD")
     )
 ]
 
@@ -17,7 +17,7 @@ This investigates how images are distributed across the 15 MVTec categories. Ide
 #align(center)[
     #figure(
         image("../../../images/EDA/category_distribution_pie.svg", width: 67.5%),
-        caption: ("")
+        caption: ("Distribution of images across MVTec AD categories")
     )
 ]
 
@@ -29,7 +29,7 @@ This figure shows the proportion of normal and defective samples within each cat
 #align(center)[
     #figure(
         image("../../../images/EDA/defect_distribution_category_chart.svg", width: 67.5%),
-        caption: ("")
+        caption: ("Proportion of normal and defective samples by category")
     )
 ]
 
