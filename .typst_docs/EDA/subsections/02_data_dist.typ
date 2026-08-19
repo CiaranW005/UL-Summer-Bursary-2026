@@ -16,7 +16,9 @@ This investigates how images are distributed across the 15 MVTec categories. Ide
 
 #align(center)[
     #figure(
-        image("../../../images/EDA/category_distribution_pie.svg", width: 67.5%),
+        move(dx: -8mm)[
+            #image("../../../images/EDA/category_distribution_bar.svg", width:75%)
+        ],
         caption: ("Distribution of images across MVTec AD categories")
     )
 ]
@@ -28,7 +30,7 @@ This figure shows the proportion of normal and defective samples within each cat
 
 #align(center)[
     #figure(
-        image("../../../images/EDA/defect_distribution_category_chart.svg", width: 67.5%),
+        image("../../../images/EDA/defect_distribution_category_chart.svg", width: 75%),
         caption: ("Proportion of normal and defective samples by category")
     )
 ]
