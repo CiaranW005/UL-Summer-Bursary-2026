@@ -1,6 +1,6 @@
 == CLS Embedding Statistics
 
-#let cls_results = csv("../../../data/results/base_embeds/cls_embed_summary.csv")
+#let cls_results = csv("../../../data/results/pretrained/cls_embed_summary.csv")
 
 #table(
   columns: 8,

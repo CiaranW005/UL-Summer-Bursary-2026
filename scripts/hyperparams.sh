@@ -4,5 +4,5 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-python -m src.experiments.training_sweeps.sweep_anomaly_head_params
+# python -m src.experiments.training_sweeps.sweep_anomaly_head_params
 python -m src.experiments.training_sweeps.sweep_adapter_param

@@ -1,8 +1,85 @@
+#import "@preview/wrap-it:0.1.1": wrap-content
+
 == Patch Embedding Statistics
 
-#let patch_results = csv("../../../data/results/base_embeds/patch_embed_summary.csv")
+#let patch_results = csv("../../../data/results/pretrained/patch_embed_summary.csv")
 
 #set text(size: 10pt)
+
+#let cluster_table = table(
+  columns: (auto, auto, auto, auto),
+
+  table.header(
+    [*Category*],
+    [*Sil.*],
+    [*DB*],
+    [*CH*]
+  ),
+
+  ..patch_results.slice(1).map(row => (
+    [#row.at(0)],
+    [#row.at(1)],
+    [#row.at(2)],
+    [#row.at(3)]
+  )).flatten()
+)
+
+#wrap-content(
+  cluster_table,
+  [so does typing here lead to this being moved over enough such that itll overflow naturally yes it does very cool and how does this work with overflow,  how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow ],
+  align: top + right,
+  column-gutter: 1em
+) 
+
+#let inter_table = table(
+    columns: (auto, auto, auto, auto),
+
+  table.header(
+    [*Category*],
+    [*Normal*],
+    [*Defect*],
+    [*Sep. Ratio*]
+  ),
+
+  ..patch_results.slice(1).map(row => (
+    [#row.at(0)],
+    [#row.at(4)],
+    [#row.at(5)],
+    [#row.at(6)]
+  )).flatten()
+)
+
+#wrap-content(
+  inter_table,
+  [so does typing here lead to this being moved over enough such that itll overflow naturally yes it does very cool ],
+  align: top + left,
+  column-gutter: 1em
+) 
+
+#let intra_table = table(
+    columns: (auto, auto, auto, auto),
+
+  table.header(
+    [*Category*],
+    [*Normal*],
+    [*Defect*],
+    [*Ratio*]
+  ),
+
+  ..patch_results.slice(1).map(row => (
+    [#row.at(0)],
+    [#row.at(7)],
+    [#row.at(8)],
+    [#row.at(9)]
+  )).flatten()
+)
+
+#wrap-content(
+  intra_table,
+  [so does typing here lead to this being moved over enough such that itll overflow naturally yes it does very cool ],
+  align: top + right,
+  column-gutter: 1em
+) 
 
 #scale(
   x: 125%,
