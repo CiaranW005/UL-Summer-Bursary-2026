@@ -6,8 +6,24 @@
 
 #set text(size: 10pt)
 
-#let cluster_table = table(
+#let cluster_table = box(
+  stroke: (
+    left: 0.8pt,
+    right: 0.8pt,
+    top: none,
+    bottom: none,
+  ),
+  inset: (x: 0.5em, y: 1em),
+)[
+  #align(center)[
+    *Cluster Metrics*
+  ]
+
+  #table(
   columns: (auto, auto, auto, auto),
+  stroke: (x: none, y: 0.5pt),
+  
+  table.hline(stroke: 0.8pt),
 
   table.header(
     [*Category*],
@@ -23,16 +39,30 @@
     [#row.at(3)]
   )).flatten()
 )
-
+]
 #wrap-content(
   cluster_table,
-  [so does typing here lead to this being moved over enough such that itll overflow naturally yes it does very cool and how does this work with overflow,  how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow ],
+  [so does typing here lead to this being moved over enough such that itll overflow naturally yes it does very cool and how does this work with overflow,  how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow how does this work with overflow  ],
   align: top + right,
   column-gutter: 1em
 ) 
 
-#let inter_table = table(
+#let inter_table = box(
+  stroke: (
+    left: 0.8pt,
+    right: 0.8pt,
+    top: none,
+    bottom: none,
+  ),
+  inset: (x: 0.5em, y: 1em),
+)[
+  #align(center)[
+    *Inter-Distances*
+  ]
+
+  #table(
     columns: (auto, auto, auto, auto),
+    stroke: (x: none, y: 0.5pt),
 
   table.header(
     [*Category*],
@@ -48,6 +78,7 @@
     [#row.at(6)]
   )).flatten()
 )
+]
 
 #wrap-content(
   inter_table,
@@ -56,8 +87,22 @@
   column-gutter: 1em
 ) 
 
-#let intra_table = table(
+#let intra_table =  box(
+  stroke: (
+    left: 0.8pt,
+    right: 0.8pt,
+    top: none,
+    bottom: none,
+  ),
+  inset: (x: 0.5em, y: 1em),
+)[
+  #align(center)[
+    *Intra-Distances*
+  ]
+ 
+  #table(
     columns: (auto, auto, auto, auto),
+    stroke: (x: none, y: 0.5pt),
 
   table.header(
     [*Category*],
@@ -72,7 +117,7 @@
     [#row.at(8)],
     [#row.at(9)]
   )).flatten()
-)
+)]
 
 #wrap-content(
   intra_table,
