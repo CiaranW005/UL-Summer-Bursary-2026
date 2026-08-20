@@ -1,9 +1,20 @@
 == CLS Embedding Projections
 
 #figure(
-  image("../../../images/baseline/base_embeds/cls_embedding_comparison.svg",width: 120%),
-  caption: ("Embedding Projections of CLS tokens")
-)
+  box(
+    width: 130%,
+    height: 75mm,
+    clip: true,
+  )[
+    #move(dy: -8mm)[
+      #image(
+        "../images/cls_proj.png",
+        width: 100%,
+      )
+    ]
+  ],
+  caption: [Embedding Projections of CLS tokens]
+) <fig:embed_proj_cls>
 
 Within the PCA projection, we can observe how the embedding space is organised along the two principal components that capture the greatest variance in the data. Several categories form distinct clusters that reflect similarities in their visual appearance. For example, relatively flat and homogeneous objects such as tile, leather, and wood are positioned closer together, while categories such as screw occupy a more distant region of the embedding space due to their more complex geometric structure and visual texture.
 
@@ -12,8 +23,20 @@ In the t-SNE projection, we can observe how compact or diffuse each category is 
 Finally, the UMAP projection highlights how distinct the local neighbourhoods are within the embedding space and how compact these neighbourhoods remain. The observations regarding cluster compactness are similar to those seen in the t-SNE projection, with grid and screw again emerging as the most diffuse categories. Rather than forming a single coherent cluster, samples from these categories occupy multiple regions of the embedding space, with the screw category appearing to split into three distinct subregions. This provides further insight into the lower anomaly detection performance observed for screw in the previous analysis. Since normal samples are distributed across several disconnected regions rather than a single compact cluster, anomaly scoring methods may struggle to distinguish normal and defective samples consistently, resulting in reduced AUROC performance.
 
 #figure(
-  image("../../../images/baseline/base_embeds/def_normal.svg", width: 120%)
-)
+  box(
+    width: 130%,
+    height: 75mm,
+    clip: true,
+  )[
+    #move(dy: -8mm)[
+      #image(
+        "../images/cls_defect_v_norm.png",
+        width: 100%,
+      )
+    ]
+  ],
+  caption: [Embedding Projections of Normal vs Defective CLS Tokens]
+) <fig:nvd_cls>
 
 For the PCA projection, there is unsurprisingly little separation between normal and defective samples. Since PCA preserves the directions of greatest global variance, the principal components are dominated by category-level differences rather than the subtle differences introduced by anomalies. As a result, normal and defective samples largely occupy the same regions of the embedding space.
 

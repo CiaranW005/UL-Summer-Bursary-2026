@@ -1,6 +1,6 @@
-#let org_results = csv("../../../../data/results/base_embeds/auroc_stats.csv")
-#let hyp_results = csv("../../../../data/results/base_embeds/hypersphere_auroc_stats.csv")
-#let ell_results = csv("../../../../data/results/base_embeds/ellipsoid_auroc_stats.csv")
+#let org_results = csv("../../../../data/results/pretrained/auroc_stats.csv")
+#let hyp_results = csv("../../../../data/results/pretrained/hypersphere_auroc_stats.csv")
+#let ell_results = csv("../../../../data/results/pretrained/ellipsoid_auroc_stats.csv")
 
 #grid(
   columns: 4,

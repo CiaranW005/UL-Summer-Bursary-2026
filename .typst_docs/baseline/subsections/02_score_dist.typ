@@ -6,84 +6,41 @@ A reusable plotting function is used to compare the anomaly score distributions 
 
 AUROC is also computed for each category to quantify how well the selected scoring method ranks defective samples above normal samples.
 
+#let results = csv("../../../data/results/pretrained/auroc_stats.csv")
 
-#let results = csv("../../../data/results/base_embeds/auroc_stats.csv")
-
-
-
-
-#grid(
-  columns: 4,
-  column-gutter: 0.39cm,
-  align: bottom + center,
-
-
-  table(
-    columns: 1,
-    rows: 5,
-    align: center,
-
-
-    [*Method*],
-    [Centroid], [KNN],
-    [Avg-KNN], [Mahalanobis]
-  ),
-
-
-  table(
-    columns: 3,
-    rows: 5,
-    align: center,
-
-
-    [*#results.at(0).at(1)*],
-    [*#results.at(0).at(2)*],
-    [*#results.at(0).at(3)*],
-
-
-    ..results.slice(1).map(row => (
-      [#row.at(1)],
-      [#row.at(2)],
-      [#row.at(3)]
-    )).flatten()
-  ),
-
-
-  table(
-    columns: 2,
-    rows: 5,
-    align: center,
-
-
-    [*Min Category*], [*Value*],
-
-
-    ..results.slice(1).map(row => (
-      [#row.at(4)],
-      [#row.at(5)]
-    )).flatten()
-  ),
-
-
-  table(
-    columns: 2,
-    rows: 5,
-    align: center,
-
-
-    [*Max Category*], [*Value*],
-
-
-    ..results.slice(1).map(row => (
-      [#row.at(6)],
-      [#row.at(7)]
-    )).flatten()
-  ),
+#let labels = (
+  [Centroid],
+  [KNN],
+  [Avg-KNN],
+  [Mahalanobis]
 )
 
-
 #align(center)[
-  *AUROCS for each scoring method*
+  #figure(
+    table(
+      columns: 8,
+      align: center,
+      stroke: (x: none, y: 0.5pt),
+      inset: (x: 2.5mm),
+
+      table.hline(stroke: 0.8pt),
+      table.vline(x: 4, stroke: 0.5pt),
+      table.vline(x: 6, stroke: 0.5pt),
+
+      [*Method*],
+      [*Mean*], [*Median*], [*Std*],
+      [*Min Category*], [*Value*],
+      [*Max Category*], [*Value*],
+
+      table.hline(stroke: 0.8pt),
+
+      ..results.slice(1).enumerate().map(((i, row)) => (
+        labels.at(i),
+        ..row.slice(1)
+      )).flatten(),
+    ),
+    caption: [Aurocs for each scoring method]
+  )
 ]
 
 

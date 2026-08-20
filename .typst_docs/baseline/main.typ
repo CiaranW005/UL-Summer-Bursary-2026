@@ -6,4 +6,6 @@
 
 #include "subsections/01_cls_score.typ"
 
+#pagebreak()
+
 #include "subsections/02_score_dist.typ"
