@@ -8,3 +8,7 @@
 #pagebreak()
 
 #include "subsections/02_score_dist.typ"
+
+#include "subsections/03_dino_layers.typ"
+
+#include "subsections/04_other_baselines.typ"

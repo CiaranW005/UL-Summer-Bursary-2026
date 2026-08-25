@@ -8,10 +8,12 @@ The purpose of this section is to:
   - Centroid Distance
   - K-Nearest Neighbours (KNN)
   - Mahalanobis Distance
-
-+ Analyse the distribution of anomaly scores for normal and defective samples to determine how well each method separates the two classes.
-+ Compare methods using AUROC to identify the most effective baseline anomaly scoring approach. AUROC is used because it evaluates ranking performance across all possible decision thresholds, avoiding the need to select a fixed anomaly threshold for baseline comparison.
+  and compare their ability to distinguish normal and defective samples using AUROC. AUROC is used because it evaluates ranking performance across all possible decision thresholds, avoiding the need to select a fixed anomaly threshold for baseline comparison.
 
 + Identify categories that are already well separated within the embedding space, as well as categories that remain challenging and may benefit from additional experimentation.
+
++ Examine anomaly-detection performance across the twelve DINOv2 transformer layers to determine how the usefulness of the representation develops through the network and whether earlier layers provide comparable performance at reduced computational cost.
+
++ Compare the DINOv2-based baseline with established anomaly-detection approaches, examining differences in their backbone architectures, feature representations, and methods for modelling normal data and producing anomaly scores.
 
 The results obtained in this section serve as a baseline against which subsequent approaches, including fine-tuned and semi-supervised representations, are compared.

@@ -30,5 +30,6 @@
 
 #pagebreak()
 #bibliography((
-  "references/eda.bib"
+  "references/eda.bib",
+  "references/baseline.bib"
 ))

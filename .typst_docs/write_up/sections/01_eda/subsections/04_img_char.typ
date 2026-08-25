@@ -69,9 +69,12 @@ Image-level statistics are computed for every image in the dataset. Brightness i
 
 Several notable observations can be made from the image characteristic analysis:
 
-- Image resolution is consistent within each category but varies between categories, ranging from 700x700 to 1024x1024 pixels.
-- Brightness varies significantly between categories due to differences in object appearance and material properties, but remains highly consistent within individual categories.
-- Sharpness and contrast exhibit greater variation between categories, reflecting differences in texture complexity and surface structure.
-- Categories such as carpet, wood, and toothbrush contain substantially more texture detail than smoother categories such as capsule and screw.
+- Image resolution is consistent within each category but varies between categories, ranging from 700x700 to 1024x1024 pixels. Higher-resolution images may   preserve finer defect details, while resizing may reduce the visibility of very small anomalies, particularly when images are resized to the 224x224 resolution used in this work.
 
-These findings suggest that resizing and normalization will be necessary during preprocessing, while category-specific texture complexity may influence anomaly detection performance.
+- Brightness varies significantly between categories due to differences in object appearance and material properties, but remains highly consistent within individual categories. Categories with greater variation in brightness may be more difficult to model consistently, as changes in illumination could resemble or obscure anomalous regions.
+
+- Sharpness and contrast exhibit greater variation between categories, reflecting differences in texture complexity and surface structure. Higher contrast may make local defects easier to distinguish where the anomaly differs strongly from the surrounding surface. Differences in sharpness may also influence how clearly small structural defects are represented, particularly where anomalies depend on fine edges or surface details.
+
+- Categories such as carpet, wood, and toothbrush contain substantially more texture detail than smoother categories such as capsule and screw. Categories with greater texture complexity may be more challenging because normal appearance already contains substantial local variation, while visually smoother and more consistent categories may allow anomalous regions to stand out more clearly against the normal appearance.
+
+These observations provide several hypotheses regarding how image characteristics may influence anomaly-detection difficulty, which can be investigated in subsequent analysis and future work.
