@@ -4,9 +4,18 @@
     y: 2.1cm,
   ),
 )
+#set page(
+  numbering: "i",
+)
 
 #outline()
 #pagebreak()
+
+#counter(page).update(1)
+
+#set page(
+  numbering: "1",
+)
 
 #include "sections/01_eda/main.typ"
 
@@ -15,6 +24,9 @@
 
 #pagebreak()
 #include "sections/03_embed_visuals/main.typ"
+
+#pagebreak()
+#include "sections/04_correlation/main.typ"
 
 #pagebreak()
 #bibliography((

@@ -1,4 +1,4 @@
-= Embedding Space Visualisation
+= Embedding Space Visualisation <section:embed_vis>
 
 This section investigates the structure of the pretrained embedding space to determine what information is represented before task-specific training and how this structure relates to anomaly detection performance. Analysis is performed at both the global image level, using CLS embeddings, and the local level, using patch embeddings. This distinction allows the representation of complete images to be compared with the local structure associated with individual anomalous regions, providing insight into whether anomaly information that is distinct at the patch level is retained within the final global representation.
 
