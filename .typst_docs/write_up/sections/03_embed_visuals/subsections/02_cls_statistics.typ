@@ -1,4 +1,4 @@
-=== Embedding Statistics
+=== Embedding Statistics <section:cls_embed_stats>
 
 This section quantitatively evaluates the structure of the CLS embedding space identified in the preceding projections. The analysis examines normal-defective cluster quality, the position of test embeddings relative to the learned normal training representation, and the compactness of normal and defective groups. These statistics are used to determine whether the visual structures observed in the projections are also present in the original embedding space and to investigate how differences in CLS geometry relate to dataset characteristics and the baseline anomaly-detection results.
 

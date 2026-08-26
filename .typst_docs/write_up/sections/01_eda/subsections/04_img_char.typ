@@ -65,7 +65,7 @@ Image-level statistics are computed for every image in the dataset. Brightness i
   caption: [Image-level statistics by MVTec AD category.]
 )
 
-=== Observations
+=== Observations <section:image_obs>
 
 Several notable observations can be made from the image characteristic analysis:
 

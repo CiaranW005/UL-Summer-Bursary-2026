@@ -1,5 +1,5 @@
 
-== CLS #sym.arrow.l.r Patch Correlation
+== CLS #sym.arrow.l.r Patch Correlation <section:cls_patch_corr>
 
 This section examines relationships between CLS- and patch-level embedding statistics to determine whether properties of the local patch representation are reflected in the final global representation. These correlations do not directly describe how patch information is aggregated into the CLS token, but may identify local embedding characteristics associated with desirable CLS-level properties. In particular, this analysis considers whether patch-level characteristics could provide useful objectives or diagnostics during future fine-tuning, with the aim of improving CLS metrics such as the Davies-Bouldin Index and Calinski-Harabasz Index. 
 #align(center)[

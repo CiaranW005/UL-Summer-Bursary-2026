@@ -1,6 +1,6 @@
 = Baseline Model
 
-This section explores the pretrained embeddings produced by the DINOv2 ViT-S/14 model. DINOv2 was selected because its self-supervised training produces general-purpose visual representations without requiring task-specific labels, making it well suited to the unsupervised setting considered in this work. The ViT-S/14 (approximately 21 million parameters) variant was chosen as a relatively compact model that provides both global CLS and local patch representations, allowing the same backbone to support the image-level experiments in this study and subsequent investigation of local anomaly representations.
+This section explores the pretrained embeddings produced by the DINOv2 ViT-S/14 model@dinov2. DINOv2 was selected because its self-supervised training produces general-purpose visual representations without requiring task-specific labels, making it well suited to the unsupervised setting considered in this work. The ViT-S/14 (approximately 21 million parameters) variant was chosen as a relatively compact model that provides both global CLS and local patch representations, allowing the same backbone to support the image-level experiments in this study and subsequent investigation of local anomaly representations.
 
 The purpose of this section is to:
 

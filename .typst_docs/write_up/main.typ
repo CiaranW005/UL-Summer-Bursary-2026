@@ -29,7 +29,12 @@
 #include "sections/04_correlation/main.typ"
 
 #pagebreak()
+#include "sections/09x_future_work/main.typ"
+
+#pagebreak()
 #bibliography((
   "references/eda.bib",
-  "references/baseline.bib"
+  "references/baseline.bib",
+  "references/embed_visuals.bib",
+  "references/fine_tuning.bib"
 ))

@@ -1,6 +1,6 @@
 == CLS Embeddings
 
-The CLS embedding provides a single global representation of an input image. In the Vision Transformer, information from the image patches is aggregated into the CLS token, producing one embedding that represents the image as a whole. In this work, the CLS representation is used for image-level anomaly detection, where normal and defective samples are compared within the pretrained embedding space. The following subsections first examine the organisation of these embeddings visually and then quantify their normal-defective structure using cluster and distance-based statistics.
+The CLS embedding provides a single global representation of an input image. In the Vision Transformer, information from the image patches is aggregated into the CLS token, producing one embedding that represents the image as a whole.@vit In this work, the CLS representation is used for image-level anomaly detection, where normal and defective samples are compared within the pretrained embedding space. The following subsections first examine the organisation of these embeddings visually and then quantify their normal-defective structure using cluster and distance-based statistics.
 
 === Embedding Projections
 

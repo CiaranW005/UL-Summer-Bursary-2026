@@ -1,6 +1,6 @@
 == DINOv2 Layers
 
-This section examines anomaly-detection performance across all twelve transformer layers of DINOv2 [REF]. The purpose is to determine how the quality of the representation develops through the network and whether the final layers provide sufficient additional performance to justify their computational cost. This is relevant both during inference, where an earlier output could potentially allow the model to terminate before the final transformer blocks, and during future fine-tuning, where an MLP or alternative prediction head could potentially operate on an earlier representation.
+This section examines anomaly-detection performance across all twelve transformer layers of DINOv2 @dinov2. The purpose is to determine how the quality of the representation develops through the network and whether the final layers provide sufficient additional performance to justify their computational cost. This is relevant both during inference, where an earlier output could potentially allow the model to terminate before the final transformer blocks, and during future fine-tuning, where an MLP or alternative prediction head could potentially operate on an earlier representation.
 
 #align(center)[
   #figure(
