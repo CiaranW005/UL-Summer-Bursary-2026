@@ -1,4 +1,4 @@
-== Adaptive Multi-Hypersphere Fitting
+=== Adaptive Multi-Hypersphere Fitting
 
 This cell implements the full unsupervised hypersphere fitting algorithm. The aim is to cover all normal training embeddings using a set of local hyperspheres, while ensuring that each training embedding is assigned to only one region.
 
@@ -26,6 +26,6 @@ The algorithm proceeds as follows:
    The process repeats until every normal training embedding has been assigned to a hypersphere.
 
 #figure(
-  image("../../../images/ellipsoid/base_embeds/sphere_plot/screw.svg", width: 800pt, height: 300pt),
+  image("../images/sphere_plot_screw.svg", width: 800pt, height: 300pt),
   caption: [Hypersphere PCA plot for screw category]
 )

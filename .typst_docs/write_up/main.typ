@@ -29,6 +29,9 @@
 #include "sections/04_correlation/main.typ"
 
 #pagebreak()
+#include "sections/05_algorithm/main.typ"
+
+#pagebreak()
 #include "sections/09x_future_work/main.typ"
 
 #pagebreak()
@@ -36,5 +39,6 @@
   "references/eda.bib",
   "references/baseline.bib",
   "references/embed_visuals.bib",
+  "references/algorithm.bib",
   "references/fine_tuning.bib"
 ))

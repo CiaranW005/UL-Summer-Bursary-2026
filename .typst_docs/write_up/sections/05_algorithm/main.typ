@@ -1,3 +1,5 @@
+#set heading(numbering: "1.")
+#set page(numbering: "1")
 
 #include "subsections/intro.typ"
 
@@ -20,5 +22,3 @@
 #include "subsections/08_results.typ"
 
 #include "subsections/09_future_work.typ"
-
-#bibliography("refs.bib")

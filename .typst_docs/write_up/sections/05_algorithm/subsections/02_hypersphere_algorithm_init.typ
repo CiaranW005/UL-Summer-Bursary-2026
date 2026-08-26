@@ -5,7 +5,7 @@ This section visualises how a global Mahalanobis ellipsoid fits the normal train
 The objective is not to evaluate the performance of Mahalanobis, but rather to understand the assumptions it makes about the embedding space. In particular, Mahalanobis models the normal distribution as a single ellipsoidal region defined by the global centroid and covariance matrix. The following visualisations illustrate how well this assumption represents the underlying embedding distribution before introducing the proposed multi-region fitting approach.
 
 #figure(
-  image("../../../images/ellipsoid/base_embeds/mahlanobis_fit/screw.svg", width: 105%),
+  image("../images/screw_mahalanobis.svg", width: 105%),
   caption: [Mahalanobis fit of the screw category in PCA]
 )
 
@@ -20,7 +20,7 @@ Selecting an appropriate value for K is important. If K is too small, the initia
 As each MVTec AD category contains a different number of normal training samples, selecting a fixed value of K would not scale consistently across categories. Instead, K is defined as a percentage of the available training embeddings. Three candidate values (2.5%, 5%, and 10%) are visually compared to determine a suitable compromise between capturing a dense local neighbourhood while avoiding an overly large initial region.
 
 #figure(
-  image("../../../images/ellipsoid/base_embeds/k_rate/screw.svg", width: 110%),
+  image("../images/screw_k.svg", width: 110%),
   caption: [K values for each percentage of the screw category]
 )
 
@@ -37,7 +37,7 @@ Starting from the initial KNN region, the hypersphere is iteratively expanded by
 The purpose of the growth stage is to allow each hypersphere to adapt naturally to the local structure of the embedding space rather than being constrained by the initial KNN selection. In particular, it reduces the likelihood of producing a large number of singleton or very small hyperspheres, allowing neighbouring embeddings that belong to the same local region to be grouped together.
 
 #figure(
-  image("../../../images/ellipsoid/base_embeds/growth_rate/screw.svg", width: 80%),
+  image("../images/screw_grow.svg", width: 80%),
   caption: [Various growth rates for the screw category]
 )
 
