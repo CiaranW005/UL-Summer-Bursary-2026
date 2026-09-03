@@ -2,7 +2,9 @@
 import numpy as np
 import pandas as pd 
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
+
+import time
 
 from tqdm.auto import tqdm
 
@@ -78,11 +80,18 @@ class BootstrapRunner:
 
         self.rng = np.random.default_rng(seed)
 
+        self.ell_fit_times: list[float] = []
+        self.mal_fit_times: list[float] = []
+
+        self.ell_eval_times: list[float] = []
+        self.mal_eval_times: list[float] = []
+
     def run(self,
             train_emb: np.ndarray,
             good_test_emb: np.ndarray,
             defect_test_emb: np.ndarray
         )-> tuple[pd.DataFrame, pd.DataFrame]:
+
         test_df = self.bootstrap_test_embeds(
             train_emb=train_emb,
             good_test_emb=good_test_emb,
@@ -102,6 +111,9 @@ class BootstrapRunner:
             good_test_emb: np.ndarray,
             defect_test_emb: np.ndarray
         )-> pd.DataFrame:
+        ell_time: float = 0
+        mal_time: float = 0
+
         results: list[BootstrapResults] = []
 
         collection = self.cover.run(embeds=train_emb)
@@ -129,23 +141,31 @@ class BootstrapRunner:
             good_boot_emb = good_test_emb[good_idx]
             defect_boot_emb = defect_test_emb[defect_idx]
 
+            ell_start = time.perf_counter()
             evaluation = self.evaluator.evaluate_detection(
                 good_test_emb=good_boot_emb,
                 defect_test_emb=defect_boot_emb,
                 collection=collection
             )
+            ell_end = time.perf_counter()
 
+            mal_start = time.perf_counter()
             mal_score = self.mal_detector.evaluate_detection(
                 good_embeds=good_boot_emb,
                 defect_embeds=defect_boot_emb
             )
+            mal_end = time.perf_counter()
     
             results.append(BootstrapResults(
                 bootstrap=idx, 
                 alg_metrics=evaluation.metrics,
                 mal_auroc=mal_score,
             ))
+            ell_time += ell_end - ell_start
+            mal_time += mal_end - mal_start
 
+        self.ell_eval_times.append(ell_time / self.test_bootstraps)
+        self.mal_eval_times.append(mal_time / self.test_bootstraps)
         return pd.DataFrame(r.to_dict() for r in results)
 
     def bootstrap_train_embeds(self,
@@ -153,6 +173,8 @@ class BootstrapRunner:
             good_test_emb: np.ndarray,
             defect_test_emb: np.ndarray
         )-> pd.DataFrame:
+        ell_time: float = 0
+        mal_time: float = 0
 
         results: list[TrainBootstrapResults] = []
 
@@ -162,10 +184,15 @@ class BootstrapRunner:
                 len(train_emb),
                 replace=True
             )
-
             train_bootstrap = train_emb[sample_idx]
+
+            mal_start = time.perf_counter()
             self.mal_detector.fit(train_bootstrap)
+            mal_end = time.perf_counter()
+
+            ell_start = time.perf_counter()
             collection = self.cover.run(embeds=train_bootstrap)
+            ell_end = time.perf_counter()
 
             evaluation = self.evaluator.evaluate_detection(
                 good_test_emb=good_test_emb,
@@ -198,6 +225,11 @@ class BootstrapRunner:
                 rank_mean=stats_df["rank"].mean()
             ))
 
+            ell_time += ell_end - ell_start
+            mal_time += mal_end - mal_start
+
+        self.ell_fit_times.append(ell_time / self.train_bootstraps)
+        self.mal_fit_times.append(mal_time / self.train_bootstraps)
         return (pd.DataFrame(r.to_dict() for r in results))
 
     @staticmethod
@@ -215,4 +247,18 @@ class BootstrapRunner:
 
         return pd.Series(summary)
 
+    @property
+    def avg_ell_fit_time(self) -> float:
+        return float(np.mean(self.ell_fit_times))
 
+    @property
+    def avg_mal_fit_time(self) -> float:
+        return float(np.mean(self.mal_fit_times))
+
+    @property
+    def avg_ell_eval_time(self) -> float:
+        return float(np.mean(self.ell_eval_times))
+
+    @property
+    def avg_mal_eval_time(self) -> float:
+        return float(np.mean(self.mal_eval_times))

@@ -79,7 +79,7 @@ class EllipsoidFitter:
         )
 
         support_id = int(np.argmax(sims))
-        support = previous_ellipsoids[support_id]
+        support = nearest_ellipsoids[support_id]
 
         alpha = min(1.0, len(X) / self.support_points)
         eigvals, eigvecs = self._blend_covariance(
