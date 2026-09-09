@@ -226,7 +226,8 @@ Reducing the candidate variance along this direction provides the most direct wa
 The candidate embedding contributing most strongly to this same axis is therefore selected as
 
 $$
-j^* = \arg \max_j \frac{(v_{i^*}^T (x_j-\mu))^2}{\lambda_{i^*}}
+j^* = \arg\max_j
+\frac{\left(v_{i^*}^T(x_j-\mu)\right)^2}{\lambda_{i^*}}
 $$
 
 Rather than immediately discarding $x_{j^*}$, its weight is reduced. A binary search is used to determine the largest weight that removes the encroachment while retaining as much of the original candidate neighbourhood as possible.
