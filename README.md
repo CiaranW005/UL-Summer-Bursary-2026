@@ -411,6 +411,6 @@ Mahalanobis produces a score relative to a single global distribution. In contra
 
 Rather than only indicating that a sample is anomalous, the method can identify the closest local normal region and quantify how far the sample lies beyond that region's learned boundary. This makes it possible to relate an anomalous sample back to a specific subset of the normal training distribution.
 
-![Ellipsoid interpretability example](data/images/ellipsoid/base_embeds/cloud_of_ellipsoids_interpretability.png)
+![Ellipsoid interpretability example](images/ellipsoid/base_embeds/cloud_of_ellipsoids_interpretability.png)
 
 The current results therefore suggest a trade-off. Global Mahalanobis provides stronger anomaly separation, while Cloud of Ellipsoids provides a richer representation of local normal structure and greater interpretability.
