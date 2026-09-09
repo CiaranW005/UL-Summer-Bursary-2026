@@ -27,6 +27,13 @@ This motivates the central question of the project: **can a multimodal represent
 - [Cloud of Ellipsoids Paper](.documents/Cloud_of_Ellipsoids.pdf)
 - [Data Exploration Write-up](.typst_docs/write_up/main.pdf) *(in progress)*
 
+## Key Findings
+
+- Cloud of Ellipsoids underperforms the global Mahalanobis baseline on raw AUROC (0.934 vs. 0.958), and this gap holds up under 1,000-sample bootstrap resampling on both the training and test sets.
+- The apparent win on "screw" disappears once bootstrapped , a reminder that single-category improvements need robustness checks before being trusted.
+- The main trade-off: Mahalanobis wins on raw separation, but Cloud of Ellipsoids offers richer interpretability, each sample is explained relative to a specific local normal mode rather than a single global distribution, at ~6.5–11x the computational cost.
+- An SVD-based reformulation of ellipsoid fitting gave a ~47x speedup (5.46s → 115ms), making it practical to iterate on the method at the scale needed for the bootstrap analysis above.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -44,7 +51,11 @@ This motivates the central question of the project: **can a multimodal represent
       - [Low-support Ellipsoids](#low-support-ellipsoids)
       - [Scoring](#scoring)
     - [Hyperparameter Table](#hyperparameter-table)
-
+  - [Results](#results)
+    - [Bootstrap Robustness](#bootstrap-robustness)
+    - [Computational Cost](#computational-cost)
+    - [Interpretability](#interpretability)
+    
 ## Overview
 
 The work in this repository can be divided into two main areas:
@@ -333,3 +344,72 @@ Negative scores indiciate that the sample lies within at least one ellipsoid, wh
 |Ellipsoidal Reg. $\epsilon$ | $1 \times 10^-4$ |
 | $r_{min}$ | $1 \times 10 ^-4$ |
 | Blending weight $\alpha$ | $min(1, \frac{n}{5})$ |
+
+## Results
+**Results Table (AUROC)**
+
+|**Category**|**Ellipsoid**|**Mahalanobis**|
+|---|---|---|
+| bottle | 0.997 | 1.0 |         
+| cable | 0.883 | 0.945 |
+| capsule | 0.874 | 0.941 |
+| carpet | 0.972 | 0.98 |
+| grid | 0.97 | 0.983 |
+| hazelnut | 0.931 | 0.949 |
+| leather | 1.0 | 1.0 |
+| metal nut | 0.935 | 0.983 |
+| pill | 0.91 | 0.95 |
+| screw | 0.808 | 0.802 |
+| tile | 0.999 | 1.0 |
+| toothbrush | 0.958 | 0.972 |
+| transistor | 0.891 | 0.935 |
+| wood | 0.902 | 0.944 |
+| zipper | 0.983 | 0.987 |
+
+Overall, the *Cloud of Ellipsoids* method performs below the global Mahalanobis baseline, achieving a mean AUROC of 0.934 compared with 0.958 for Mahalanobis.
+
+This corresponds to a reduction of 0.024 mean AUROC, suggesting that the additional flexibility introduced by modelling multiple local ellipsoidal regions does not, in its current form, improve anomaly separation across MVTec AD.
+
+The main exception is screw, where the ellipsoidal method slightly outperforms Mahalanobis. However, the bootstrap analysis below shows that this improvement is not stable under resampling.
+
+### Bootstrap Robustness
+
+To evaluate sensitivity to the available samples, both training and test variation were assessed using 1,000 bootstrap resamples.
+
+For the training bootstrap, normal training embeddings were resampled with replacement, both models were refitted, and performance was evaluated on the original test set.
+
+For the test bootstrap, normal and anomalous test embeddings were resampled with replacement while the fitted models were held fixed. The mean AUROC is given for each method and accompanied by 95% confidence intervals.
+
+|**Bootstrap**|**Ellipsoid AUROC**|**Mahalanobis AUROC**|**Mean Difference**|
+|---|---|---|---|
+| Training | 0.924[0.903, 0.944] | 0.957[0.944, 0.967] | -0.033[-0.054, -0.011] |
+| Test | 0.934[0.887, 0.971] | 0.964[0.927, 0.986] | -0.030[-0.059, -0.001] |
+
+The gap between the two methods becomes more pronounced under training resampling, with the ellipsoidal method showing greater sensitivity to changes in the normal training set.
+
+The apparent improvement for screw also disappears under both training and test bootstrapping, indicating that the original advantage is not robust.
+
+### Computational Cost
+
+The ellipsoidal method is more expensive than Mahalanobis because it fits multiple local regions rather than a single global distribution.
+
+|**Operation**|**Ellipsoidal**|**Mahalanobis**|**Relative Cost** |
+|---|---|---|---|
+| Fitting | ~115ms/category | ~10ms/category | ~11x |
+| Evaluation | ~10.3ms/category | ~1.6ms/category | ~6.5x |
+
+Despite typically fitting around 30-40 ellipsoids per category, fitting time increases by approximately one order of magnitude rather than scaling directly with the number of regions.
+
+The absolute runtime of both methods therefore remains relatively low.
+
+### Interpretability
+
+Although the ellipsoidal method does not currently outperform Mahalanobis overall, it provides additional information about how a sample relates to the learned normal space.
+
+Mahalanobis produces a score relative to a single global distribution. In contrast, Cloud of Ellipsoids evaluates each sample against multiple local regions and identifies the region that provides the closest normal explanation.
+
+Rather than only indicating that a sample is anomalous, the method can identify the closest local normal region and quantify how far the sample lies beyond that region's learned boundary. This makes it possible to relate an anomalous sample back to a specific subset of the normal training distribution.
+
+![Ellipsoid interpretability example](data/images/ellipsoid/base_embeds/cloud_of_ellipsoids_interpretability.png)
+
+The current results therefore suggest a trade-off. Global Mahalanobis provides stronger anomaly separation, while Cloud of Ellipsoids provides a richer representation of local normal structure and greater interpretability.
