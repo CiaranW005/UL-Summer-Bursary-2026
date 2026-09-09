@@ -327,8 +327,9 @@ s(x) = min_j m_{j(x)}
 $$
 
 where:
+
 $$
-j^* = arg min_j m_{j(x)}
+j^* = \arg \min_j m_{j(x)}
 $$
 
 Identifies the corresponding normal region. 
@@ -342,8 +343,8 @@ Negative scores indiciate that the sample lies within at least one ellipsoid, wh
 |Low support threshold| 5 |
 |Low support candidates| 5|
 |Growth factor $g$ | 1.1 |
-|Ellipsoidal Reg. $\epsilon$ | $1 \times 10^-4$ |
-| $r_{min}$ | $1 \times 10 ^-4$ |
+|Ellipsoidal Reg. $\epsilon$ | $1 \times 10^{-4}$ |
+| $r_{min}$ | $1 \times 10^{-4}$ |
 | Blending weight $\alpha$ | $min(1, \frac{n}{5})$ |
 
 ## Results
