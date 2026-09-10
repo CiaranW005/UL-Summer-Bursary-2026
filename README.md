@@ -65,10 +65,11 @@ This motivates the central question of the project: **can a multimodal represent
 
 ## Overview
 
-The work in this repository can be divided into two main areas:
+The work in this repository can be divided into three main areas:
 
 1. **Embedding Space Analysis**
 2. **Multi-Region Modelling and Evaluation**
+3. **Fine-Tuning Objectives**
 
 ### Embedding Space Analysis
 
@@ -353,6 +354,46 @@ Negative scores indicate that the sample lies within at least one ellipsoid, whi
 |Ellipsoidal Reg. $\epsilon$ | $1 \times 10^{-4}$ |
 | $r_{min}$ | $1 \times 10^{-4}$ |
 | Blending weight $\alpha$ | $min(1, \frac{n}{5})$ |
+
+### Fine-Tuning Objectives
+
+Fine-tuning was divided into two categories: **unsupervised** and **semi-supervised** fine-tuning.
+
+#### Unsupervised Fine-Tuning
+
+In the unsupervised setting, only the normal training data from MVTec AD was used during optimisation. No defective samples were included when adapting the representation.
+
+#### Semi-Supervised Fine-Tuning
+In the semi-supervised setting, a small number of defective samples from MVTec AD were included to provide the model with examples of anomalous appearance. Five negative samples were selected for each category where possible. If a category contained at least five distinct defect types, one sample was drawn from five different defect types. If fewer than five defect types were available, each defect type was represented at least once and the remaining samples were drawn randomly from the available defect types.
+
+#### Model Variants and Staged Training
+
+For each training approach, three different model variants were evaluated:
+
+- Fine-tuning the final DINOv2 transformer block
+- Adding an additional transformer block on top of the pretrained DINOv2 backbone
+- Adding an MLP projection head on top of the pretrained DINOv2 representation
+
+These components were not evaluated only as standalone modifications. Training was also staged so that one adapted representation could be used as the starting point for a later stage using a different objective or model component.
+
+For example:
+
+Baseline DINOv2 -> MLP projection head (unsupervised) -> Additional DINO transformer block (semi-supervised)
+
+or:
+
+Baseline DINOv2 -> Fine-tuned final DINO block (unsupervised) -> MLP projection head (semi-supervised)
+
+Individual components were also evaluated independently, for example:
+
+Baseline DINOv2 -> Additional DINO transformer block (unsupervised)
+
+and:
+
+Baseline DINOv2 -> Fine-tuned final DINO block (semi-supervised)
+
+This staged design allowed the project to investigate both the effect of individual architectural changes and whether unsupervised and semi-supervised adaptation could be combined sequentially.
+
 
 ## Results
 **Results Table (AUROC)**
