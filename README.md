@@ -55,6 +55,12 @@ This motivates the central question of the project: **can a multimodal represent
     - [Bootstrap Robustness](#bootstrap-robustness)
     - [Computational Cost](#computational-cost)
     - [Interpretability](#interpretability)
+  - [Future Work](#future-work)
+    - [Region Starting Point](#region-starting-point)
+    - [Usable Dimensions](#usable-dimensions)
+    - [Human in the loop](#human-in-the-loop)
+    - [Fine-Tuning](#fine-tuning)
+    - [Demo Product](#demo-product)
 
 ## Overview
 
@@ -268,7 +274,7 @@ A point satisfying the inequality lies inside the fitted ellipsoid, while a poin
 
 ##### Low-support Ellipsoids
 
-As the algorithm runs samples become more sparse and evntually it becomes difficult to estimate a stable covariance as the sampel size is too small for this project those samples were chosen as $n < 5$ based on evaluation done in [*Cloud of Ellipsoids](notebooks/algorithms/unsupervised_ellipsoidal_fit.ipynb) where it looks at how buckets of samples relate to AUROC and hwo stable they are in relation to AUROC and it was found these were the unstable versions. Now there is covariance regularisation techniques such as Ledoit-Wolf which makes in basic term the ellipsoid more sphereical and isotropic due to having less samples. This wouldnt work here as youd then be expanding into an unknown region without the information to back that up so instead I added a mechanism that allowed low support ellipsoids to borrow covariance from similar ellipsoids.
+As the algorithm runs samples become more sparse and evntually it becomes difficult to estimate a stable covariance as the sampel size is too small for this project those samples were chosen as $n < 5$ based on evaluation done in [*Cloud of Ellipsoids*](notebooks/algorithms/unsupervised_ellipsoidal_fit.ipynb) where it looks at how buckets of samples relate to AUROC and hwo stable they are in relation to AUROC and it was found these were the unstable versions. Now there is covariance regularisation techniques such as Ledoit-Wolf which makes in basic term the ellipsoid more sphereical and isotropic due to having less samples. This wouldnt work here as youd then be expanding into an unknown region without the information to back that up so instead I added a mechanism that allowed low support ellipsoids to borrow covariance from similar ellipsoids.
 
 Support selection is performed in two stages. First, the candidate set is restricted to the five previously fitted ellipsoids whose centres are nearest to the candidate centre under Euclidean distance. This preserves locality in the original DINOv2 embedding space before geometric similarity is considered.
 
@@ -415,3 +421,70 @@ Rather than only indicating that a sample is anomalous, the method can identify 
 ![Ellipsoid interpretability example](images/ellipsoid/base_embeds/cloud_of_ellipsoids_interpretability.png)
 
 The current results therefore suggest a trade-off. Global Mahalanobis provides stronger anomaly separation, while Cloud of Ellipsoids provides a richer representation of local normal structure and greater interpretability.
+
+## Future Work
+
+### Region Starting Point
+The first major area for future work is the selection of starting regions.
+
+The current method uses K-Nearest Neighbours to identify dense areas of the embedding space and uses these as the basis for new regions. While this provides a simple and effective starting point, density alone may not be sufficient. A highly dense neighbourhood can still contain multiple distinct modes of variation, meaning that treating the entire neighbourhood as a single region may merge structure that would be better represented by several separate ellipsoids.
+
+A future version of the algorithm could therefore consider additional local properties when selecting candidate starting regions, such as density, variance structure, anisotropy, effective dimensionality, and local covariance stability. This could allow the model to distinguish between a genuinely coherent local mode and a dense neighbourhood containing several different forms of normal variation.
+
+This would also introduce an additional source of interpretability. Rather than only identifying the local region closest to a test sample, the model could potentially describe the type of variation represented by that region and compare a sample against different normal modes.
+
+However, this relies on an important assumption: the pretrained Vision Transformer must encode meaningful visual variation within the embedding space. For example, different faces of the same object may ideally form distinct local modes if their appearance changes substantially. It is not guaranteed, however, that the resulting embedding differences correspond specifically to the visual variation of interest; they may instead be driven by unrelated characteristics of the image.
+
+Future experiments will therefore investigate whether the local modes discovered within the DINOv2 embedding space correspond to meaningful variations in the underlying images, and whether these modes can be used reliably when constructing and interpreting the ellipsoidal representation.
+
+### Usable Dimensions
+
+Because the DINOv2 embedding space is anisotropic, not all 384 dimensions necessarily contribute equally to the representation. Some dimensions may explain a substantial proportion of the observed variation, while others contribute only a very small amount.
+
+One direction for future work is therefore to investigate how many dimensions are actually required by the ellipsoidal model. This could be evaluated by retaining enough principal dimensions to explain fixed proportions of the variance, for example 90%, 95%, and 99%, and measuring how each choice affects anomaly-detection performance.
+
+This creates an important trade-off. Removing low-variance dimensions would reduce the dimensionality of the ellipsoid fitting problem, lowering the computational cost of SVD and avoiding calculations over dimensions that contribute very little to the normal representation. In some cases, sufficiently reducing the dimensionality may also reduce the extent to which local ellipsoids are rank-deficient.
+
+However, low-variance dimensions should not automatically be treated as unimportant. It is possible that some of the information which separates anomalous samples from normal samples is contained precisely within these smaller-variance directions. The effect of dimensionality reduction should therefore be evaluated directly against AUROC rather than selecting dimensions solely according to explained variance.
+
+If these low-variance dimensions are found to contain useful anomaly information, an alternative direction would be to introduce a small learned projection head on top of DINOv2. Rather than discarding dimensions outright, this projection could compress the 384-dimensional representation into a smaller subspace while attempting to preserve information relevant to both normal variation and anomaly separation.
+
+This could potentially provide a lower-dimensional representation for ellipsoid fitting without losing useful information contained in the original embedding. The appropriate architecture and training objective for such a projection remain open questions and would require further investigation.
+
+### Human in the loop
+
+Rather than treating a single automatically generated ellipsoidal representation as the optimal solution for every embedding space, a future version of the method could expose several plausible ways of modelling the normal distribution and allow the user to prioritise the properties most relevant to their application.
+
+At the beginning of fitting, the algorithm could generate multiple candidate starting regions and rank them according to different criteria, such as density, variance structure, support size, expected coverage, anomaly-separation performance, or interpretability. The preferred candidate would then depend on the objective being prioritised rather than on a single fixed heuristic.
+
+For example, if the primary objective is anomaly-detection performance, the preferred representation may be one that preserves the strongest separation between normal and anomalous samples. As shown in the Results, this may in some cases favour a much more global representation rather than a highly fragmented cloud of local ellipsoids.
+
+Alternatively, a user may prioritise interpretability. In this case, the algorithm could favour regions that capture distinct directions or modes of normal variation. Several ellipsoids representing similar local structure could collectively describe a disconnected normal manifold, allowing samples to be interpreted according to the particular mode of normality to which they are most closely related.
+
+Other applications may prioritise confidence or robustness. For example, a user could require that each fitted ellipsoid contain at least $n$ supporting samples, reducing the number of poorly supported local regions even if this results in a coarser representation of the embedding space.
+
+There are therefore many valid ways of representing the same normal embedding distribution. Assuming that one fixed fitting strategy is optimal for every dataset, category, or application may be unnecessarily restrictive. A human-in-the-loop approach could instead allow the algorithm to propose several statistically plausible representations while allowing the user to decide which trade-offs are most appropriate for the intended use case.
+
+### Fine-Tuning
+
+The current approach assumes that the pretrained DINOv2 representation already encodes the forms of visual variation that are useful for anomaly detection. This may not always be true, as DINOv2 was not trained specifically to distinguish the structured differences that separate normal and defective samples within an industrial anomaly-detection setting.
+
+A future stage of the project could therefore investigate whether the representation can be adapted to become more sensitive to structured variation within normal MVTec AD data. Rather than directly training the model to classify defects, the objective would be to encourage the embedding space to represent meaningful forms of visual variation more explicitly, allowing these differences to be modelled more effectively by the local ellipsoidal regions.
+
+Using MVTec AD for this purpose would mean that it could no longer be treated as an untouched benchmark dataset. However, this is considered an acceptable trade-off. A lot of analysis has already been performed on MVTec AD to understand which dataset and embedding-space characteristics are associated with anomaly-detection performance. It therefore makes sense to treat MVTec AD as a construction and development case for the representation and adaptive fitting strategy rather than as the final measure of generalisation.
+
+Once the representation-learning and fitting strategy have been developed on MVTec AD, the resulting model could be frozen and evaluated on previously unseen datasets. This could include MVTec AD 2, an additional industrial anomaly-detection dataset from a different source, and a dataset from a substantially different domain such as medical imaging.
+
+This would allow the project to evaluate not only whether representation adaptation improves the construction case, but also whether the learned sensitivity to structured variation transfers to new industrial settings and to a broader domain shift.
+
+### Demo Product
+
+Although the full workflow could be executed and evaluated entirely through the command line, a more useful demonstration would provide an interactive way to inspect how the embedding space is represented, how the algorithm constructs its regions, and how different anomaly-scoring methods compare.
+
+A future demo could therefore visualise the learned embedding space using a dimensionality-reduction technique and overlay the regions produced by the algorithm. This would allow users to inspect which samples are grouped together, where individual ellipsoids are positioned, how much support each region contains, and where anomalous samples fall relative to the learned normal structure.
+
+The demo could also expose different scoring methods side by side, allowing the same sample to be compared under approaches such as global Mahalanobis distance and Cloud of Ellipsoids. This would make the trade-off between global anomaly separation and local interpretability much easier to understand than through aggregate metrics alone.
+
+The most appropriate dimensionality-reduction technique for this visualisation would need further evaluation. t-SNE may be useful because of its ability to preserve local neighbourhood structure, which is particularly relevant to the local-region interpretation used by Cloud of Ellipsoids. However, alternatives such as UMAP or PCA may provide more stable or globally interpretable visualisations depending on the intended use of the demo.
+
+More broadly, the interface could act as an interactive analysis layer over the full pipeline, allowing users to compare different fitted representations, inspect individual regions, view supporting samples, and understand why a particular test sample receives its anomaly score.
