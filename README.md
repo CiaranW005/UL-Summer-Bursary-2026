@@ -61,6 +61,7 @@ This motivates the central question of the project: **can a multimodal represent
     - [Human in the loop](#human-in-the-loop)
     - [Fine-Tuning](#fine-tuning)
     - [Demo Product](#demo-product)
+  - [Usage](#usage)
 
 ## Overview
 
@@ -99,7 +100,7 @@ Several simple anomaly-scoring methods are compared:
 * [Mahalanobis distance](https://arxiv.org/abs/2003.00402)
 
 Mahalanobis distance is selected as the primary global baseline. In addition to its performance, it provides a useful comparison for the later multi-region approach: rather than fitting a single global distribution to all normal embeddings, the proposed method can be viewed as fitting several local Mahalanobis-like regions to different parts of the normal embedding space.
-Theres also a brief notebook for determining which layer performs the baseline the best in [Dino Layers](notebooks/embedding_analysis/dino_layer_analysis.ipynb) to see if the final DINO layer should be chosen for further analysis which it was found it was.
+There's also a brief notebook for determining which layer performs the baseline the best in [Dino Layers](notebooks/embedding_analysis/dino_layer_analysis.ipynb) to see if the final DINO layer should be chosen for further analysis which it was found it was.
 
 #### Embedding Visualisation
 
@@ -274,7 +275,7 @@ A point satisfying the inequality lies inside the fitted ellipsoid, while a poin
 
 ##### Low-support Ellipsoids
 
-As the algorithm runs samples become more sparse and evntually it becomes difficult to estimate a stable covariance as the sampel size is too small for this project those samples were chosen as $n < 5$ based on evaluation done in [*Cloud of Ellipsoids*](notebooks/algorithms/unsupervised_ellipsoidal_fit.ipynb) where it looks at how buckets of samples relate to AUROC and hwo stable they are in relation to AUROC and it was found these were the unstable versions. Now there is covariance regularisation techniques such as Ledoit-Wolf which makes in basic term the ellipsoid more sphereical and isotropic due to having less samples. This wouldnt work here as youd then be expanding into an unknown region without the information to back that up so instead I added a mechanism that allowed low support ellipsoids to borrow covariance from similar ellipsoids.
+As the algorithm runs samples become more sparse and eventually it becomes difficult to estimate a stable covariance as the sample size is too small for this project those samples were chosen as $n < 5$ based on evaluation done in [*Cloud of Ellipsoids*](notebooks/algorithms/unsupervised_ellipsoidal_fit.ipynb) where it looks at how buckets of samples relate to AUROC and how stable they are in relation to AUROC and it was found these were the unstable versions. Now there is covariance regularisation techniques such as Ledoit-Wolf which makes in basic term the ellipsoid more spherical and isotropic due to having less samples. This wouldn't work here as you'd then be expanding into an unknown region without the information to back that up so instead a mechanism was added that allowed low support ellipsoids to borrow covariance from similar ellipsoids.
 
 Support selection is performed in two stages. First, the candidate set is restricted to the five previously fitted ellipsoids whose centres are nearest to the candidate centre under Euclidean distance. This preserves locality in the original DINOv2 embedding space before geometric similarity is considered.
 
@@ -290,7 +291,7 @@ $$
 S_{embed} = \frac{c^T \mu_s}{||c||||\mu_s||}
 $$
 
-Geometric similarity measure how closely $d$ aligns with the principal aces $v_{s, i}$ of the supported ellipsoid. Each aligment is weighted by the corresponding axis length:
+Geometric similarity measure how closely $d$ aligns with the principal axes $v_{s, i}$ of the supported ellipsoid. Each alignment is weighted by the corresponding axis length:
 
 $$
 S_{shape} = \frac{\sum_i|d^Tv_{s, i}\sqrt{\lambda_{s, i} + \epsilon}}{\sum_i\sqrt{\lambda_{s, i} + \epsilon}}
@@ -302,9 +303,9 @@ $$
 S_{support} = \frac{S_{embed} + S_{shape}}{2}
 $$
 
-For low-support candidates containing more than one sample, some local covariance can already be estimated. Support similarity is therefore defined as the mean of the singular values of $V_c^T V_s$, which measures aligment between the candidate and support principal subspaces.
+For low-support candidates containing more than one sample, some local covariance can already be estimated. Support similarity is therefore defined as the mean of the singular values of $V_c^T V_s$, which measures alignment between the candidate and support principal subspaces.
 
-After selcting the highest socring local support ellipsoid, its covaraince is blended with that of the candidate according to 
+After selecting the highest scoring local support ellipsoid, its covariance is blended with that of the candidate according to 
 
 $$
 C_b = \alpha C_c + (1 - \alpha)C_s
@@ -316,11 +317,11 @@ $$
 \alpha = \min(1, \frac{n}{5})
 $$
 
-Consequently, the contribution of the borrows covariance decreases as additional local evidence becomes available, with the candidate covaraiance used independently once $n \ge 5$
+Consequently, the contribution of the borrows covariance decreases as additional local evidence becomes available, with the candidate covariance used independently once $n \ge 5$
 
 ##### Scoring
 
-At inference, each test embedding is evaluated against every ellipsoid in the learned cloud. From ellipsoid j, the boundary margin is defined as the sqaured ellipsoidal distances from the same minus the fitted threshold:
+At inference, each test embedding is evaluated against every ellipsoid in the learned cloud. From ellipsoid j, the boundary margin is defined as the squared ellipsoidal distances from the same minus the fitted threshold:
 
 $$
 min_j m_{j(x)} = d_{j(x)}^2 - \tau_j
@@ -339,7 +340,7 @@ j^* = \arg \min_j m_{j(x)}
 $$
 
 Identifies the corresponding normal region. 
-Negative scores indiciate that the sample lies within at least one ellipsoid, while positive scores indicate that it lies outside every modelled region of normality. Increasing positive margin therefore represents increasing deviation from the learned normal space.
+Negative scores indicate that the sample lies within at least one ellipsoid, while positive scores indicate that it lies outside every modelled region of normality. Increasing positive margin therefore represents increasing deviation from the learned normal space.
 
 #### Hyperparameter Table
 
@@ -488,3 +489,44 @@ The demo could also expose different scoring methods side by side, allowing the 
 The most appropriate dimensionality-reduction technique for this visualisation would need further evaluation. t-SNE may be useful because of its ability to preserve local neighbourhood structure, which is particularly relevant to the local-region interpretation used by Cloud of Ellipsoids. However, alternatives such as UMAP or PCA may provide more stable or globally interpretable visualisations depending on the intended use of the demo.
 
 More broadly, the interface could act as an interactive analysis layer over the full pipeline, allowing users to compare different fitted representations, inspect individual regions, view supporting samples, and understand why a particular test sample receives its anomaly score.
+
+## Usage
+
+This project has currently only been validated on **Linux**, specifically **Ubuntu 26.04**. While parts of the project may also be compatible with Windows, the current `requirements.txt` and development environment are Linux-dependent.
+
+A virtual environment can be created and the required dependencies installed using:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+Embedding extraction can be started with:
+
+```bash
+python -m src.data.main
+```
+
+This opens an interactive prompt allowing the user to select which available model or representation should be used for embedding extraction. Selecting option [1] gives access to the base DINOv2 model used throughout the main experiments in this repository.
+
+Additional models can be trained and accessed through the [Train Models](notebooks/train_models) folder. Hyperparameter sweeps can also be run in stages using:
+
+```bash
+bash ./scripts/stage_1.sh
+bash ./scripts/stage_2.sh
+bash ./scripts/stage_3.sh
+```
+
+Models produced during a previous stage are used as the starting point for the next stage. The best configuration found during this process can be trained using:
+
+```bash
+bash ./scripts/hyperparams.sh
+```
+
+The main Cloud of Ellipsoids algorithm can then be tested in [*Cloud of Ellipsoids*](notebooks/algorithms/unsupervised_ellipsoidal_fit.ipynb), while robustness experiments can be run through the [*Bootstrap Analysis*](notebooks/algorithms/bootstraps.ipynb).
+
+The embedding set used by these notebooks can be changed by updating the `EMBED_PATH` variable to point to the desired embedding directory.
+
+If the selected embeddings were produced using a trained model with negative samples, `MODEL_PATH` should also be updated to point to the directory containing the corresponding `metadata.json` file for that model.
